@@ -1,0 +1,10 @@
+{
+  "name": "pokeworld",
+  "private": true,
+  "scripts": {
+    "start": "node apps/server/index.js"
+  },
+  "engines": {
+    "node": "22"
+  }
+}
