@@ -447,7 +447,9 @@ function pill(type) {
 function creatureCard(mon, role) {
   if (!mon) return `<article class="card ${role}"></article>`;
   const key = typeKey(mon.type);
+  const size = role.includes("foe") ? (role.includes("short") ? 48 : 72) : 48;
   return `<article class="card ${role}">
+    ${sprite(mon.species, size)}
     <p class="creature${key ? " t-" + key : ""}">${esc(mon.species)}</p>
     <p class="meta">${pill(mon.type)}<span>레벨 ${num(mon.level)}</span></p>
     <div class="hp"><span class="fill${key ? " t-" + key : ""}" style="width:${hpWidth(mon.hp, mon.maxHp)}"></span></div>
@@ -457,12 +459,13 @@ function creatureCard(mon, role) {
 
 function partyButton(p, act, extra) {
   if (!p) {
-    return `<div class="row"><span class="creature">비어 있음</span></div>`;
+    return `<div class="row"><span class="art"></span><span class="creature">비어 있음</span></div>`;
   }
   const key = typeKey(p.type);
   const lead = leadSlot() === p.slot ? "선두" : "";
   const open = extra.open ? `<span class="extra">${esc(extra.extra || "")}</span>` : "";
   return `<button type="button" class="row${extra.sel ? " sel" : ""}" data-act="${act}" data-slot="${p.slot}"${extra.disabled ? " disabled" : ""}>
+    <span class="art">${sprite(p.species, 32)}</span>
     <span class="creature${key ? " t-" + key : ""}">${esc(p.species)}</span>
     <span class="tagline">${esc(extra.tag || lead)}</span>
     <span class="meta">${pill(p.type)}<span>레벨 ${num(p.level)}</span></span>
@@ -548,7 +551,7 @@ function renderRival() {
   return `<div class="stage">
       <p class="sub">하림마을</p>
       <h1>민재</h1>
-      <div class="grow"></div>
+      <div class="pair">${sprite(mine, 72)}${sprite(other, 72)}</div>
       <div class="line">
         <p>나 민재야. 너는 ${esc(eul(mine))} 골랐구나. 나는 ${esc(other)}로 갈게.</p>
         <p>북쪽 풀숲으로 가. 야생 네이몬을 만나면 기술이나 볼을 써.</p>
@@ -564,9 +567,12 @@ function renderStarter() {
     const key = typeKey(s.type);
     const sel = pickedSpecies === s.species;
     return `<button type="button" class="starter${sel ? " sel" : ""}" data-act="pick-species" data-species="${esc(s.species)}"${busy ? " disabled" : ""}>
-      ${pill(s.type)}
-      <span class="creature${key ? " t-" + key : ""}">${esc(s.species)}</span>
-      <span class="moves">${esc(s.move1)} · ${esc(s.move2)}</span>
+      ${sprite(s.species, 80)}
+      <span class="starter-copy">
+        ${pill(s.type)}
+        <span class="creature${key ? " t-" + key : ""}">${esc(s.species)}</span>
+        <span class="moves">${esc(s.move1)} · ${esc(s.move2)}</span>
+      </span>
     </button>`;
   }).join("");
   let extra = "";
@@ -588,7 +594,9 @@ function renderStarter() {
 function renderField() {
   const rows = MAP.map((row, y) => row.map((tile, x) => {
     const here = state.x === x && state.y === y;
-    return `<div class="cell ${tile}${here ? " here" : ""}">${esc(TILE[tile] || "")}${here ? `<span class="who"></span>` : ""}</div>`;
+    const lead = party().find((p) => p.hp >= 1) || party()[0];
+    const body = here && lead ? sprite(lead.species, 22) : esc(TILE[tile] || "");
+    return `<div class="cell ${tile}${here ? " here" : ""}">${body}</div>`;
   }).join("")).join("");
   const lockMove = busy || sheet;
   const dir = (d, label, on) => `<button type="button" data-act="move" data-dir="${d}"${lockMove || !on ? " disabled" : ""}>${label}</button>`;
@@ -668,7 +676,9 @@ function dexHtml() {
       const extra = open
         ? `${esc(row.habitat || "")}${known ? " · " + esc(known.move1) + " · " + esc(known.move2) : ""}`
         : "";
+      const dim = row.status === "unseen" ? "dim" : "";
       return `<button type="button" class="row dexrow" data-act="dex" data-species="${esc(row.species)}">
+        <span class="art">${sprite(row.species, 32, dim)}</span>
         <span class="creature${key ? " t-" + key : ""}">${esc(row.species)}</span>
         <span class="tagline">${esc(status)}</span>
         <span class="meta">${pill(row.type)}</span>
