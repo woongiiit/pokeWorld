@@ -38,7 +38,6 @@ const ERROR_KO = {
   species: "그 네이몬은 안 돼",
   unauthorized: "다시 들어와",
 };
-const GROUP_ORDER = ["시작", "풀숲", "돌밭", "개울", "오늘"];
 
 const app = document.getElementById("app");
 
@@ -52,7 +51,7 @@ let overlay = null;
 let pickedSpecies = "";
 let picked = null;
 let openSlot = null;
-let openDex = "";
+let dexPage = 0;
 let nickDraft = "";
 let tutor = localStorage.getItem("pw_tutor") || "seoha";
 let remainBase = 0;
@@ -670,48 +669,38 @@ function renderField() {
     ${extra}${toastBox()}`;
 }
 
-function dexGroup(habitat) {
-  const h = String(habitat || "");
-  if (h.includes("스타터") || h === "시작") return "시작";
-  if (h.includes("풀숲")) return "풀숲";
-  if (h.includes("돌밭")) return "돌밭";
-  if (h.includes("개울")) return "개울";
-  if (h.includes("오늘")) return "오늘";
-  return h || "기록";
+function dexCaughtIndex() {
+  const rows = state.dex || [];
+  const caught = rows.findIndex((row) => row.status === "caught");
+  if (caught >= 0) return caught;
+  const seen = rows.findIndex((row) => row.status === "seen");
+  return seen >= 0 ? seen : 0;
 }
 
 function dexHtml() {
-  const groups = new Map();
-  (state.dex || []).forEach((row) => {
-    const g = dexGroup(row.habitat);
-    if (!groups.has(g)) groups.set(g, []);
-    groups.get(g).push(row);
-  });
-  const names = [...groups.keys()].sort((a, b) => {
-    const ia = GROUP_ORDER.indexOf(a);
-    const ib = GROUP_ORDER.indexOf(b);
-    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-  });
-  return names.map((name) => {
-    const rows = groups.get(name).map((row) => {
-      const key = typeKey(row.type);
-      const open = openDex === row.species;
-      const status = STATUS[row.status] || row.status || "";
-      const known = party().find((p) => p.species === row.species);
-      const extra = open
-        ? `${esc(row.habitat || "")}${known ? " · " + esc(known.move1) + " · " + esc(known.move2) : ""}`
-        : "";
-      const dim = row.status === "unseen" ? "dim" : "";
-      return `<button type="button" class="row dexrow" data-act="dex" data-species="${esc(row.species)}">
-        <span class="art">${sprite(row.species, 32, dim)}</span>
-        <span class="creature${key ? " t-" + key : ""}">${esc(row.species)}</span>
-        <span class="tagline">${esc(status)}</span>
-        <span class="meta">${pill(row.type)}</span>
-        ${open ? `<span class="extra">${extra}</span>` : ""}
-      </button>`;
-    }).join("");
-    return `<p class="group">${esc(name)}</p>${rows}`;
-  }).join("");
+  const rows = state.dex || [];
+  const total = rows.length;
+  if (!total) return `<p class="hint">아직이야</p>`;
+  if (dexPage < 0 || dexPage >= total) dexPage = 0;
+  const row = rows[dexPage];
+  const hidden = row.status === "unseen";
+  const caught = rows.filter((item) => item.status === "caught").length;
+  const known = hidden ? null : party().find((mon) => mon.species === row.species);
+  const key = hidden ? "" : typeKey(row.type);
+  const habitat = hidden ? "" : row.habitat || "";
+  const moves = known ? [known.move1, known.move2].filter(Boolean).join(" · ") : "";
+  return `<div class="dexpage">
+    <p class="tagline">잡은 ${num(caught)} · ${num(dexPage + 1)}/${num(total)}</p>
+    <div class="art">${hidden ? `<span class="blank"></span>` : sprite(row.species, 80, row.status === "caught" ? "" : "dim")}</div>
+    <p class="creature${key ? " t-" + key : ""}">${hidden ? "빈 칸" : esc(row.species)}</p>
+    <p class="meta">${hidden ? "" : pill(row.type)}${known ? `<span>레벨 ${num(known.level)}</span>` : ""}</p>
+    <p class="hint">${hidden ? "아직이야" : esc(STATUS[row.status] || "")}${habitat ? " · " + esc(habitat) : ""}</p>
+    ${moves ? `<p class="hint">${esc(moves)}</p>` : ""}
+    <div class="dexnav">
+      <button type="button" data-act="dex-prev"${dexPage === 0 ? " disabled" : ""}>이전</button>
+      <button type="button" data-act="dex-next"${dexPage >= total - 1 ? " disabled" : ""}>다음</button>
+    </div>
+  </div>`;
 }
 
 function renderBattle() {
@@ -918,19 +907,23 @@ app.addEventListener("click", (e) => {
   }
   if (act === "open-dex") {
     sheet = "dex";
-    openDex = "";
+    dexPage = dexCaughtIndex();
+    render();
+    return;
+  }
+  if (act === "dex-prev") {
+    dexPage = Math.max(0, dexPage - 1);
+    render();
+    return;
+  }
+  if (act === "dex-next") {
+    dexPage = Math.min((state?.dex || []).length - 1, dexPage + 1);
     render();
     return;
   }
   if (act === "expand") {
     const slot = num(btn.dataset.slot);
     openSlot = openSlot === slot ? null : slot;
-    render();
-    return;
-  }
-  if (act === "dex") {
-    const species = btn.dataset.species || "";
-    openDex = openDex === species ? "" : species;
     render();
     return;
   }
