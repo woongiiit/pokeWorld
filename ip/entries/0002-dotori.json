@@ -1,0 +1,34 @@
+{
+  "id": "0002",
+  "name": "도토리",
+  "genus": "활공다람쥐",
+  "region": "하림",
+  "type": "풀",
+  "type2": "비행",
+  "stage": 2,
+  "evolvesFrom": "0001",
+  "evolvesInto": "0003",
+  "evolve": "레벨 16",
+  "habitat": "낮은 나무 사이",
+  "heightCm": 61,
+  "weightG": 9200,
+  "diet": "잎과 견과. 새싹은 더 이상 먹지 않는다",
+  "social": "혼자",
+  "ability": "씨주머니",
+  "base": { "hp": 62, "atk": 68, "def": 55, "spa": 78, "spd": 62, "spe": 70 },
+  "moves": [
+    { "lv": 1, "name": "앞발치기", "type": "노말", "power": 40, "category": "물리" },
+    { "lv": 1, "name": "싹치기", "type": "풀", "power": 40, "category": "물리" },
+    { "lv": 16, "name": "바람잎", "type": "풀", "power": 60, "category": "특수" },
+    { "lv": 20, "name": "활공", "type": "비행", "power": 60, "category": "물리" }
+  ],
+  "dex": [
+    "도토리는 앞다리와 뒷다리 사이의 잎으로 나무 사이를 활공한다.",
+    "착지할 때 잎을 접지 못하면 다음날까지 비행 기술을 쓰지 못한다."
+  ],
+  "silhouette": "사지를 벌린 다람쥐. 옆구리에 얇은 잎 막이 있고 꼬리는 아직 짧다.",
+  "palette": ["짙은 밤색", "활공막의 초록"],
+  "reject": "등에 심긴 식물, 새의 부리",
+  "art": null,
+  "status": "reviewed"
+}

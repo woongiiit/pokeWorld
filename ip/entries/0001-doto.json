@@ -1,0 +1,35 @@
+{
+  "id": "0001",
+  "name": "도토",
+  "genus": "씨앗다람쥐",
+  "region": "하림",
+  "type": "풀",
+  "type2": null,
+  "stage": 1,
+  "evolvesFrom": null,
+  "evolvesInto": "0002",
+  "evolve": null,
+  "habitat": "하림광장 근처 풀밭",
+  "heightCm": 32,
+  "weightG": 3400,
+  "diet": "새싹과 견과. 배고프면 주머니의 새싹부터 먹는다",
+  "social": "혼자",
+  "ability": "씨주머니",
+  "base": { "hp": 48, "atk": 50, "def": 42, "spa": 55, "spd": 48, "spe": 47 },
+  "moves": [
+    { "lv": 1, "name": "앞발치기", "type": "노말", "power": 40, "category": "물리" },
+    { "lv": 1, "name": "겁주기", "type": "노말", "power": null, "category": "변화" },
+    { "lv": 5, "name": "싹치기", "type": "풀", "power": 40, "category": "물리" },
+    { "lv": 9, "name": "씨떨구기", "type": "풀", "power": null, "category": "변화" },
+    { "lv": 13, "name": "앞니", "type": "노말", "power": 60, "category": "물리" }
+  ],
+  "dex": [
+    "도토는 볼주머니에 새싹을 넣어 다니며, 배가 고프면 그 새싹부터 먹는다.",
+    "새싹이 마르면 풀 기술의 힘이 눈에 띄게 빠진다."
+  ],
+  "silhouette": "짧은 꼬리의 다람쥐. 양쪽 볼이 새싹 때문에 둥글게 부풀어 있다.",
+  "palette": ["밤색 등", "볼의 연두"],
+  "reject": "등 위의 구근, 공룡의 큰 머리",
+  "art": null,
+  "status": "reviewed"
+}

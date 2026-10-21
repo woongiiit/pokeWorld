@@ -1,0 +1,34 @@
+{
+  "id": "0009",
+  "name": "가리온",
+  "genus": "날개가오리",
+  "region": "하림",
+  "type": "물",
+  "type2": "비행",
+  "stage": 3,
+  "evolvesFrom": "0008",
+  "evolvesInto": null,
+  "evolve": "레벨 34",
+  "habitat": "항구 밖의 수면",
+  "heightCm": 172,
+  "weightG": 52000,
+  "diet": "수면의 플랑크톤. 배 웅덩이에 작은 물고기를 잠시 담아 둔다",
+  "social": "혼자",
+  "ability": "배웅덩",
+  "base": { "hp": 90, "atk": 78, "def": 102, "spa": 80, "spd": 96, "spe": 70 },
+  "moves": [
+    { "lv": 1, "name": "말린파도", "type": "물", "power": 65, "category": "특수" },
+    { "lv": 1, "name": "판막기", "type": "물", "power": null, "category": "변화" },
+    { "lv": 34, "name": "수면활공", "type": "비행", "power": 80, "category": "물리" },
+    { "lv": 44, "name": "웅덩이파", "type": "물", "power": 95, "category": "특수" }
+  ],
+  "dex": [
+    "가리온은 날개를 펴면 사람 키보다 넓다. 수면을 스치듯 활공하고 잠수는 짧다.",
+    "배의 웅덩이에 담아 둔 물고기가 빠져나가면 그날은 항구 쪽으로 돌아온다."
+  ],
+  "silhouette": "아주 넓은 마름모 한 장. 등껍질, 대포, 다리, 새의 부리가 없다.",
+  "palette": ["깊은 남청", "배 웅덩이의 밝은 청"],
+  "reject": "거북, 등껍질 대포, 오리, 펭귄",
+  "art": null,
+  "status": "reviewed"
+}

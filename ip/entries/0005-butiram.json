@@ -1,0 +1,34 @@
+{
+  "id": "0005",
+  "name": "부티람",
+  "genus": "불길염소",
+  "region": "하림",
+  "type": "불꽃",
+  "type2": null,
+  "stage": 2,
+  "evolvesFrom": "0004",
+  "evolvesInto": "0006",
+  "evolve": "레벨 16",
+  "habitat": "바위가 많은 비탈",
+  "heightCm": 86,
+  "weightG": 29000,
+  "diet": "관목과 탄 껍질",
+  "social": "무리",
+  "ability": "뿔심지",
+  "base": { "hp": 64, "atk": 82, "def": 58, "spa": 62, "spd": 56, "spe": 78 },
+  "moves": [
+    { "lv": 1, "name": "뿔불", "type": "불꽃", "power": 40, "category": "특수" },
+    { "lv": 1, "name": "뿔치기", "type": "불꽃", "power": 50, "category": "물리" },
+    { "lv": 16, "name": "비탈받이", "type": "노말", "power": 60, "category": "물리" },
+    { "lv": 24, "name": "뿔불길", "type": "불꽃", "power": 70, "category": "특수" }
+  ],
+  "dex": [
+    "부티람은 휘어진 뿔을 따라 불을 흘린다. 비탈을 들이받을 때 그 불이 앞으로 쏠린다.",
+    "뿔의 불이 뿔 뿌리까지 내려가면 진화가 가깝다."
+  ],
+  "silhouette": "중간 크기 염소. 곡선형 뿔 전체에 불의 선. 꼬리에 불은 없다.",
+  "palette": ["회갈색 털", "뿔의 주황 선"],
+  "reject": "말의 갈기, 꼬리 불꽃, 날개",
+  "art": null,
+  "status": "reviewed"
+}

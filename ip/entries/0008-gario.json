@@ -1,0 +1,34 @@
+{
+  "id": "0008",
+  "name": "가리오",
+  "genus": "파도가오리",
+  "region": "하림",
+  "type": "물",
+  "type2": null,
+  "stage": 2,
+  "evolvesFrom": "0007",
+  "evolvesInto": "0009",
+  "evolve": "레벨 16",
+  "habitat": "항구로 가는 강의 중간",
+  "heightCm": 84,
+  "weightG": 14000,
+  "diet": "조개 조각과 물풀",
+  "social": "짝",
+  "ability": "배웅덩",
+  "base": { "hp": 68, "atk": 58, "def": 82, "spa": 64, "spd": 74, "spe": 52 },
+  "moves": [
+    { "lv": 1, "name": "판치기", "type": "물", "power": 40, "category": "물리" },
+    { "lv": 1, "name": "물뿜기", "type": "물", "power": 40, "category": "특수" },
+    { "lv": 16, "name": "말린파도", "type": "물", "power": 65, "category": "특수" },
+    { "lv": 22, "name": "판막기", "type": "물", "power": null, "category": "변화" }
+  ],
+  "dex": [
+    "가리오는 날개 끝이 파도처럼 말려 있다. 그 끝으로 물을 감아 앞으로 민다.",
+    "짝은 같은 강의 얕은 곳과 깊은 곳에 나뉘어 있고, 저녁에만 가운데서 만난다."
+  ],
+  "silhouette": "두꺼워진 마름모 날개. 가장자리가 말려 있다. 등껍질은 없다.",
+  "palette": ["젖은 청록", "말린 끝의 흰색"],
+  "reject": "거북, 대포, 물고기 지느러미 쌍",
+  "art": null,
+  "status": "reviewed"
+}

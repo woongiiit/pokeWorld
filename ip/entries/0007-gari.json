@@ -1,0 +1,34 @@
+{
+  "id": "0007",
+  "name": "가리",
+  "genus": "웅덩이가오리",
+  "region": "하림",
+  "type": "물",
+  "type2": null,
+  "stage": 1,
+  "evolvesFrom": null,
+  "evolvesInto": "0008",
+  "evolve": null,
+  "habitat": "하림광장 개울의 얕은 곳",
+  "heightCm": 36,
+  "weightG": 2800,
+  "diet": "바닥의 이끼와 아주 작은 벌레",
+  "social": "혼자",
+  "ability": "배웅덩",
+  "base": { "hp": 50, "atk": 44, "def": 58, "spa": 48, "spd": 54, "spe": 40 },
+  "moves": [
+    { "lv": 1, "name": "판치기", "type": "물", "power": 40, "category": "물리" },
+    { "lv": 1, "name": "겁주기", "type": "노말", "power": null, "category": "변화" },
+    { "lv": 5, "name": "물뿜기", "type": "물", "power": 40, "category": "특수" },
+    { "lv": 11, "name": "젖히기", "type": "물", "power": null, "category": "변화" }
+  ],
+  "dex": [
+    "가리는 손바닥만한 가오리다. 배 한가운데 웅덩이 무늬에 물이 고여 있어야 움직인다.",
+    "무늬가 마르면 모래에 붙어 진화할 때까지 거의 움직이지 않는다."
+  ],
+  "silhouette": "납작한 마름모. 짧은 꼬리. 배 중앙에 동그란 무늬. 등껍질과 다리는 없다.",
+  "palette": ["모래 위의 청회", "배 무늬의 짙은 남색"],
+  "reject": "거북, 등껍질, 대포, 앞으로 나온 머리",
+  "art": null,
+  "status": "reviewed"
+}

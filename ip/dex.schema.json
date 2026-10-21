@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "하림도감",
+  "type": "object",
+  "required": ["id", "name", "genus", "region", "type", "type2", "stage", "evolvesFrom", "evolvesInto", "evolve", "habitat", "heightCm", "weightG", "diet", "social", "ability", "base", "moves", "dex", "silhouette", "palette", "reject", "status"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[0-9]{4}$" },
+    "name": { "type": "string", "minLength": 2, "maxLength": 8 },
+    "genus": { "type": "string" },
+    "region": { "type": "string" },
+    "type": { "enum": ["노말", "불꽃", "물", "풀", "전기", "얼음", "격투", "독", "땅", "비행", "에스퍼", "벌레", "바위", "고스트", "드래곤", "악", "강철", "페어리"] },
+    "type2": {
+      "anyOf": [
+        { "type": "null" },
+        { "type": "string", "enum": ["노말", "불꽃", "물", "풀", "전기", "얼음", "격투", "독", "땅", "비행", "에스퍼", "벌레", "바위", "고스트", "드래곤", "악", "강철", "페어리"] }
+      ]
+    },
+    "stage": { "type": "integer", "minimum": 1, "maximum": 3 },
+    "evolvesFrom": { "type": ["string", "null"] },
+    "evolvesInto": { "type": ["string", "null"] },
+    "evolve": { "type": ["string", "null"] },
+    "habitat": { "type": "string" },
+    "heightCm": { "type": "integer", "minimum": 8, "maximum": 1800 },
+    "weightG": { "type": "integer", "minimum": 50, "maximum": 500000 },
+    "diet": { "type": "string" },
+    "social": { "enum": ["혼자", "짝", "무리"] },
+    "ability": { "type": "string" },
+    "base": {
+      "type": "object",
+      "required": ["hp", "atk", "def", "spa", "spd", "spe"],
+      "additionalProperties": false,
+      "properties": {
+        "hp": { "type": "integer" },
+        "atk": { "type": "integer" },
+        "def": { "type": "integer" },
+        "spa": { "type": "integer" },
+        "spd": { "type": "integer" },
+        "spe": { "type": "integer" }
+      }
+    },
+    "moves": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["lv", "name", "type", "power", "category"],
+        "additionalProperties": false,
+        "properties": {
+          "lv": { "type": "integer" },
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "power": { "type": ["integer", "null"] },
+          "category": { "enum": ["물리", "특수", "변화"] }
+        }
+      }
+    },
+    "dex": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "string" } },
+    "silhouette": { "type": "string" },
+    "palette": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "string" } },
+    "reject": { "type": "string" },
+    "art": { "type": ["string", "null"] },
+    "status": { "enum": ["queued", "draft", "reviewed", "published"] }
+  },
+  "additionalProperties": false
+}
