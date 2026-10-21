@@ -444,6 +444,26 @@ function pill(type) {
   return `<i class="pill${key ? " t-" + key : ""}">${esc(type || "")}</i>`;
 }
 
+function statusPlate(mon) {
+  if (!mon) return "";
+  const key = typeKey(mon.type);
+  return `<div class="plate">
+    <p class="creature${key ? " t-" + key : ""}">${esc(mon.species)}</p>
+    <p class="meta">${pill(mon.type)}<span>레벨 ${num(mon.level)}</span></p>
+    <div class="hp"><span class="fill${key ? " t-" + key : ""}" style="width:${hpWidth(mon.hp, mon.maxHp)}"></span></div>
+    <p class="hpnum">${num(mon.hp)}/${num(mon.maxHp)}</p>
+  </div>`;
+}
+
+function battleStage(foe, me, slim) {
+  return `<section class="arena${slim ? " slim" : ""}">
+      <div class="lane far">
+        ${statusPlate(foe)}
+        ${sprite(foe.species, slim ? 40 : 64)}
+      </div>
+      ${me ? `<div class="lane near">${sprite(me.species, 56)}${statusPlate(me)}</div>` : ""}
+    </section>`;
+}
 function creatureCard(mon, role) {
   if (!mon) return `<article class="card ${role}"></article>`;
   const key = typeKey(mon.type);
@@ -595,7 +615,9 @@ function renderField() {
   const rows = MAP.map((row, y) => row.map((tile, x) => {
     const here = state.x === x && state.y === y;
     const lead = party().find((p) => p.hp >= 1) || party()[0];
-    const body = here && lead ? sprite(lead.species, 22) : esc(TILE[tile] || "");
+    const body = here
+      ? `<span class="walker">${sprite("트레이너", 26, "you")}</span>${lead ? `<span class="glyph">${sprite(lead.species, 14)}</span>` : ""}`
+      : `<span class="tile-name">${esc(TILE[tile] || "")}</span>`;
     return `<div class="cell ${tile}${here ? " here" : ""}">${body}</div>`;
   }).join("")).join("");
   const lockMove = busy || sheet;
@@ -714,9 +736,9 @@ function renderBattle() {
       return partyButton(p, "pick", { sel: picked === p.slot, disabled: lock, tag: "" });
     }).join("");
   } else if (phase === "turn") {
-    body = creatureCard(me, "mine");
+    body = "";
   } else {
-    body = creatureCard(me, "mine");
+    body = "";
   }
 
   let aux = "";
@@ -753,10 +775,12 @@ function renderBattle() {
     main = mainButton("판정 중", { disabled: true, pending: true });
   }
 
-  return `<div class="stage">
+  const inList = phase === "switch" || phase === "replace";
+  const stage = battleStage(b.foe, inList ? null : me, inList);
+  return `<div class="stage battle">
       <div class="track${urgent ? " urgent" : ""}"><div class="fill" id="timebar"></div></div>
       <div class="turnhead"><span>${esc(label)}</span><span id="secs"${urgent ? ' class="urgent"' : ""}>${sec}초</span></div>
-      ${creatureCard(b.foe, phase === "turn" && !overlay ? "foe" : "foe short")}
+      ${stage}
       <p class="log">${esc(oneLine(b.log))}</p>
       <div class="scroll grow">${body}</div>
     </div>

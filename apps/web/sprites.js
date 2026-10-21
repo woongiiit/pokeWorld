@@ -315,6 +315,28 @@ const SPRITES = {
       "................",
     ]],
   },
+  트레이너: {
+    motion: "breathe",
+    colors: { o: "#1c2820", h: "#2c2824", f: "#e8c9a4", e: "#1c2820", c: "#2f5c45", p: "#24382c" },
+    frames: [[
+      "................",
+      "......hhhh......",
+      "....ohhhhhho....",
+      "....ohffffho....",
+      "....oheeehfo....",
+      ".....ohffho.....",
+      "......oooo......",
+      "...occcccccco...",
+      "...occcccccco...",
+      "....occcccco....",
+      ".....oppppo.....",
+      ".....oppppo.....",
+      "......o..o......",
+      ".....oo..oo.....",
+      "................",
+      "................",
+    ]],
+  },
 };
 
 function sprite(name, px, extra) {
