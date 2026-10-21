@@ -15,12 +15,12 @@ function test(name, fn) {
   }
 }
 
-test("새싹멍 레벨 5 싹물어 vs 흙두더지 레벨 3 피해 11", () => {
-  const sprout = rules.stats("새싹멍", 5);
-  const mole = rules.stats("흙두더지", 3);
+test("도토 레벨 5 싹물어 vs 두더 레벨 3 피해 11", () => {
+  const sprout = rules.stats("도토", 5);
+  const mole = rules.stats("두더", 3);
   assert.strictEqual(sprout.attack, 14);
   assert.strictEqual(mole.defense, 13);
-  assert.strictEqual(rules.creatureMove("새싹멍", 1).power, 44);
+  assert.strictEqual(rules.creatureMove("도토", 1).power, 44);
   assert.strictEqual(rules.typeMultiplier("풀", "땅"), 100);
   assert.strictEqual(rules.damage({
     level: 5,
@@ -31,8 +31,8 @@ test("새싹멍 레벨 5 싹물어 vs 흙두더지 레벨 3 피해 11", () => {
   }), 11);
 });
 
-test("같은 기술 vs 잿빛도마뱀 레벨 3 피해 30", () => {
-  const lizard = rules.stats("잿빛도마뱀", 3);
+test("같은 기술 vs 재돌 레벨 3 피해 30", () => {
+  const lizard = rules.stats("재돌", 3);
   assert.strictEqual(lizard.defense, 10);
   assert.strictEqual(lizard.hp, 22);
   assert.strictEqual(rules.typeMultiplier("풀", "불"), 200);
@@ -46,8 +46,8 @@ test("같은 기술 vs 잿빛도마뱀 레벨 3 피해 30", () => {
 });
 
 test("스피드 12 대 7 도망 확률 65", () => {
-  assert.strictEqual(rules.stats("새싹멍", 5).speed, 12);
-  assert.strictEqual(rules.stats("흙두더지", 3).speed, 7);
+  assert.strictEqual(rules.stats("도토", 5).speed, 12);
+  assert.strictEqual(rules.stats("두더", 3).speed, 7);
   assert.strictEqual(rules.fleeChance(12, 7), 65);
 });
 
@@ -57,26 +57,26 @@ test("체력 22 포획 확률", () => {
   assert.strictEqual(rules.captureChance(1, 22), 77);
 });
 
-test("새싹멍 레벨 5 스탯 30/14/14/12", () => {
-  assert.deepStrictEqual(rules.stats("새싹멍", 5), {
+test("도토 레벨 5 스탯 30/14/14/12", () => {
+  assert.deepStrictEqual(rules.stats("도토", 5), {
     hp: 30,
     attack: 14,
     defense: 14,
     speed: 12,
   });
-  assert.deepStrictEqual(rules.stats("방울거북", 5), {
+  assert.deepStrictEqual(rules.stats("가리", 5), {
     hp: 38,
     attack: 12,
     defense: 16,
     speed: 10,
   });
-  assert.deepStrictEqual(rules.stats("불씨족제비", 5), {
+  assert.deepStrictEqual(rules.stats("부티", 5), {
     hp: 26,
     attack: 16,
     defense: 12,
     speed: 16,
   });
-  assert.deepStrictEqual(rules.stats("흙두더지", 3), {
+  assert.deepStrictEqual(rules.stats("두더", 3), {
     hp: 28,
     attack: 13,
     defense: 13,
@@ -87,15 +87,15 @@ test("새싹멍 레벨 5 스탯 30/14/14/12", () => {
 test("오늘 출현이 비면 희귀 3종은 풀숲에 없다", () => {
   assert.strictEqual(rules.TODAY_SPECIES, null);
   const grass = rules.encounterTable("grass", false).map((entry) => entry.species);
-  assert.deepStrictEqual(grass, ["흙두더지", "연못개구리", "솔방울새"]);
-  assert.deepStrictEqual(rules.weightedGrass("흙두더지", false).map((entry) => entry.weight), [2, 1, 1]);
+  assert.deepStrictEqual(grass, ["두더", "퐁이", "찔레"]);
+  assert.deepStrictEqual(rules.weightedGrass("두더", false).map((entry) => entry.weight), [2, 1, 1]);
   assert.deepStrictEqual(
-    rules.weightedGrass("이슬잠자리", false).map((entry) => entry.species),
-    ["흙두더지", "연못개구리", "솔방울새", "이슬잠자리"],
+    rules.weightedGrass("이슬꽃", false).map((entry) => entry.species),
+    ["두더", "퐁이", "찔레", "이슬꽃"],
   );
   assert.deepStrictEqual(
-    rules.weightedGrass("이슬잠자리", true).map((entry) => entry.species),
-    ["흙두더지", "연못개구리", "솔방울새"],
+    rules.weightedGrass("이슬꽃", true).map((entry) => entry.species),
+    ["두더", "퐁이", "찔레"],
   );
 });
 
@@ -137,12 +137,12 @@ test("자정 볼", () => {
 });
 
 test("경험치는 레벨 상한에서 0", () => {
-  const creature = { species: "새싹멍", level: 5, hp: 10, exp: 0 };
+  const creature = { species: "도토", level: 5, hp: 10, exp: 0 };
   rules.applyExp(creature, 80);
   assert.strictEqual(creature.level, 6);
   assert.strictEqual(creature.exp, 0);
   assert.strictEqual(creature.hp, 12);
-  const capped = { species: "새싹멍", level: 19, hp: 58, exp: 0 };
+  const capped = { species: "도토", level: 19, hp: 58, exp: 0 };
   rules.applyExp(capped, 400);
   assert.strictEqual(capped.level, 20);
   assert.strictEqual(capped.exp, 0);
@@ -150,7 +150,7 @@ test("경험치는 레벨 상한에서 0", () => {
   assert.strictEqual(capped.exp, 0);
 });
 
-function account(species = "새싹멍") {
+function account(species = "도토") {
   const player = game.createAccount({ token: "t", nickname: "숲길" });
   const chosen = game.chooseStarter(player, species, 1000);
   assert.strictEqual(chosen.status, 200);
@@ -159,9 +159,9 @@ function account(species = "새싹멍") {
 
 test("스타터 재선택은 409", () => {
   const player = account();
-  assert.strictEqual(game.handleStarter(player, "방울거북", 2000, rules.scriptedRng([])).status, 409);
+  assert.strictEqual(game.handleStarter(player, "가리", 2000, rules.scriptedRng([])).status, 409);
   assert.strictEqual(player.party.length, 1);
-  assert.strictEqual(player.party[0].species, "새싹멍");
+  assert.strictEqual(player.party[0].species, "도토");
   assert.strictEqual(player.balls, 10);
 });
 
@@ -198,9 +198,9 @@ test("풀숲 조우 후 싹물어 피해 11", () => {
   player.lastMoveAt = 1000;
   const moved = game.handleMove(player, "n", 2000, rules.scriptedRng([1, 1, 2]));
   assert.strictEqual(moved.status, 200);
-  assert.strictEqual(player.battle.foeSpecies, "흙두더지");
+  assert.strictEqual(player.battle.foeSpecies, "두더");
   assert.strictEqual(player.battle.foeLevel, 3);
-  assert.strictEqual(player.dex["흙두더지"], "seen");
+  assert.strictEqual(player.dex["두더"], "seen");
   const acted = game.handleAct(player, { kind: "move1" }, 2500, rules.scriptedRng([1, 1, 100]));
   assert.strictEqual(acted.status, 200);
   assert.strictEqual(player.battle.foeHp, 17);
@@ -208,19 +208,19 @@ test("풀숲 조우 후 싹물어 피해 11", () => {
   assert.strictEqual(player.battle.phase, "turn");
 });
 
-test("잿빛도마뱀은 피해 30으로 기절하고 경험치 24", () => {
+test("재돌은 피해 30으로 기절하고 경험치 24", () => {
   const player = account();
   player.x = 1;
   player.y = 1;
   player.lastMoveAt = 1000;
   game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
-  assert.strictEqual(player.battle.foeSpecies, "잿빛도마뱀");
+  assert.strictEqual(player.battle.foeSpecies, "재돌");
   assert.strictEqual(player.battle.foeLevel, 3);
   game.handleAct(player, { kind: "move1" }, 2500, rules.scriptedRng([1, 1]));
   assert.strictEqual(player.battle, null);
   assert.strictEqual(player.party[0].exp, 24);
   assert.strictEqual(player.party[0].level, 5);
-  assert.strictEqual(player.dex["잿빛도마뱀"], "seen");
+  assert.strictEqual(player.dex["재돌"], "seen");
   assert.deepStrictEqual([player.x, player.y], [0, 1]);
 });
 
@@ -248,41 +248,41 @@ test("체력 22 포획 20은 빈 슬롯에 넣고 볼이 준다", () => {
   assert.strictEqual(player.balls, 9);
   assert.strictEqual(player.party.length, 2);
   const caught = player.party.find((creature) => creature.slot === 1);
-  assert.strictEqual(caught.species, "잿빛도마뱀");
+  assert.strictEqual(caught.species, "재돌");
   assert.strictEqual(caught.level, 3);
   assert.strictEqual(caught.hp, 22);
   assert.strictEqual(caught.exp, 0);
-  assert.strictEqual(player.dex["잿빛도마뱀"], "caught");
+  assert.strictEqual(player.dex["재돌"], "caught");
   assert.strictEqual(player.party[0].exp, 0);
 });
 
 test("파티가 가득하면 교체 저장 전에 소유가 바뀌지 않는다", () => {
   const player = account();
-  player.party.push({ slot: 1, species: "흙두더지", level: 3, hp: 0, exp: 0 });
-  player.party.push({ slot: 2, species: "솔방울새", level: 2, hp: 5, exp: 0 });
-  player.dex["흙두더지"] = "caught";
+  player.party.push({ slot: 1, species: "두더", level: 3, hp: 0, exp: 0 });
+  player.party.push({ slot: 2, species: "찔레", level: 2, hp: 5, exp: 0 });
+  player.dex["두더"] = "caught";
   player.x = 1;
   player.y = 1;
   player.lastMoveAt = 1000;
   game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   game.handleAct(player, { kind: "ball" }, 2500, rules.scriptedRng([20]));
   assert.strictEqual(player.battle.phase, "replace");
-  assert.strictEqual(player.party.some((creature) => creature.species === "잿빛도마뱀"), false);
-  assert.strictEqual(player.dex["잿빛도마뱀"], "seen");
+  assert.strictEqual(player.party.some((creature) => creature.species === "재돌"), false);
+  assert.strictEqual(player.dex["재돌"], "seen");
   assert.strictEqual(game.handleAct(player, { kind: "flee" }, 2600, rules.scriptedRng([])).status, 400);
   assert.strictEqual(player.battle.phase, "replace");
   game.handleAct(player, { kind: "replace", slot: 1 }, 2700, rules.scriptedRng([]));
   assert.strictEqual(player.battle, null);
   assert.strictEqual(player.party.length, 3);
-  assert.strictEqual(player.party.find((creature) => creature.slot === 1).species, "잿빛도마뱀");
-  assert.strictEqual(player.dex["흙두더지"], "caught");
-  assert.strictEqual(player.dex["잿빛도마뱀"], "caught");
+  assert.strictEqual(player.party.find((creature) => creature.slot === 1).species, "재돌");
+  assert.strictEqual(player.dex["두더"], "caught");
+  assert.strictEqual(player.dex["재돌"], "caught");
 });
 
 test("교체 시간 초과는 체력 0인 가장 앞 슬롯을 보낸다", () => {
   const player = account();
-  player.party.push({ slot: 1, species: "흙두더지", level: 3, hp: 4, exp: 0 });
-  player.party.push({ slot: 2, species: "솔방울새", level: 2, hp: 5, exp: 0 });
+  player.party.push({ slot: 1, species: "두더", level: 3, hp: 4, exp: 0 });
+  player.party.push({ slot: 2, species: "찔레", level: 2, hp: 5, exp: 0 });
   player.x = 1;
   player.y = 1;
   player.lastMoveAt = 1000;
@@ -292,8 +292,8 @@ test("교체 시간 초과는 체력 0인 가장 앞 슬롯을 보낸다", () =>
   player.battle.deadline = 3000;
   game.handleState(player, 3000, rules.scriptedRng([]));
   assert.strictEqual(player.battle, null);
-  assert.strictEqual(player.party.find((creature) => creature.slot === 0).species, "잿빛도마뱀");
-  assert.strictEqual(player.party.find((creature) => creature.slot === 1).species, "흙두더지");
+  assert.strictEqual(player.party.find((creature) => creature.slot === 0).species, "재돌");
+  assert.strictEqual(player.party.find((creature) => creature.slot === 1).species, "두더");
 });
 
 test("볼 0과 전투 중 이동은 400이고 전투는 유지된다", () => {
@@ -326,7 +326,7 @@ test("패배는 입구에서 회복하고 쓴 볼은 돌아오지 않는다", ()
   player.lastMoveAt = 1000;
   player.balls = 9;
   game.handleMove(player, "n", 2000, rules.scriptedRng([1, 2, 3]));
-  assert.strictEqual(player.battle.foeSpecies, "연못개구리");
+  assert.strictEqual(player.battle.foeSpecies, "퐁이");
   player.party[0].hp = 1;
   game.handleAct(player, { kind: "move1" }, 2500, rules.scriptedRng([1, 1]));
   assert.strictEqual(player.battle, null);
@@ -334,7 +334,7 @@ test("패배는 입구에서 회복하고 쓴 볼은 돌아오지 않는다", ()
   assert.strictEqual(player.party[0].hp, 30);
   assert.strictEqual(player.party[0].exp, 0);
   assert.strictEqual(player.balls, 9);
-  assert.strictEqual(player.dex["연못개구리"], "seen");
+  assert.strictEqual(player.dex["퐁이"], "seen");
 });
 
 test("응답에 확률과 배율 필드가 없다", () => {

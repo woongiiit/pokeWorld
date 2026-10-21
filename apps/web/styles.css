@@ -473,6 +473,18 @@ h1 {
 
 .dexrow { min-height: 64px; }
 
+.line {
+  background: var(--paper);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.line p { margin: 0; }
+
 .dialog {
   position: absolute;
   left: 16px;

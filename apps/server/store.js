@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const rules = require("./rules");
 
 const dataFile = path.join(__dirname, "..", "..", "data", "state.json");
 
@@ -91,7 +92,7 @@ async function init() {
 async function load(token) {
   if (!pool) {
     const row = readFileStore().accounts[token];
-    return row ? JSON.parse(JSON.stringify(row)) : null;
+    return row ? rules.migrateAccount(JSON.parse(JSON.stringify(row))) : null;
   }
   const account = await pool.query("SELECT * FROM accounts WHERE token = $1", [token]);
   if (account.rows.length === 0) return null;
@@ -102,7 +103,7 @@ async function load(token) {
   const dexMap = {};
   for (const entry of dex.rows) dexMap[entry.species] = entry.status;
   const battleRow = battle.rows[0];
-  return {
+  const loaded = {
     token: row.token,
     nickname: row.nickname,
     balls: row.balls,
@@ -142,6 +143,7 @@ async function load(token) {
     rareSeenDate: row.rare_seen_date,
     rareSeenSpecies: row.rare_seen_species,
   };
+  return rules.migrateAccount(loaded);
 }
 
 async function save(account) {

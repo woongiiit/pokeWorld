@@ -4,38 +4,38 @@ const TURN_MS = 20000;
 
 const TODAY_SPECIES = null;
 
-const RESIDENTS = ["흙두더지", "연못개구리", "솔방울새"];
-const RARES = ["이슬잠자리", "햇살나비", "안개여우"];
-const STARTERS = ["새싹멍", "방울거북", "불씨족제비"];
+const RESIDENTS = ["두더", "퐁이", "찔레"];
+const RARES = ["이슬꽃", "햇살", "안개불"];
+const STARTERS = ["도토", "가리", "부티"];
 
 const SPECIES_ORDER = [
-  "새싹멍",
-  "방울거북",
-  "불씨족제비",
-  "흙두더지",
-  "연못개구리",
-  "솔방울새",
-  "잿빛도마뱀",
-  "바위너구리",
-  "김새우",
-  "이슬잠자리",
-  "햇살나비",
-  "안개여우",
+  "도토",
+  "가리",
+  "부티",
+  "두더",
+  "퐁이",
+  "찔레",
+  "재돌",
+  "암덩",
+  "송이",
+  "이슬꽃",
+  "햇살",
+  "안개불",
 ];
 
 const SPECIES = {
-  새싹멍: row("풀", "스타터", 22, 10, 10, 8, 2, 1, 1, 1, ["싹물어", "풀", 44, 95], ["뒹굴림", "무상성", 32, 100]),
-  방울거북: row("물", "스타터", 26, 8, 12, 6, 3, 1, 1, 1, ["물방울", "물", 40, 100], ["등껍질", "무상성", 34, 100]),
-  불씨족제비: row("불", "스타터", 18, 12, 8, 12, 2, 1, 1, 1, ["씨불꽃", "불", 46, 90], ["질주치", "무상성", 30, 100]),
-  흙두더지: row("땅", "광장 풀숲", 24, 11, 11, 5, 2, 1, 1, 1, ["두더파", "땅", 48, 90], ["흙묻힘", "무상성", 34, 100]),
-  연못개구리: row("물", "광장 풀숲", 18, 10, 8, 11, 2, 1, 1, 1, ["펄떡침", "물", 42, 100], ["혀채찍", "무상성", 30, 100]),
-  솔방울새: row("풀", "광장 풀숲", 16, 12, 7, 10, 2, 1, 1, 1, ["솔타격", "풀", 46, 90], ["부리톡", "무상성", 32, 100]),
-  잿빛도마뱀: row("불", "돌밭", 18, 13, 8, 9, 2, 1, 1, 1, ["잿더미", "불", 50, 85], ["재꼬리", "무상성", 34, 100]),
-  바위너구리: row("땅", "돌밭", 26, 9, 13, 5, 3, 1, 1, 1, ["돌구름", "땅", 42, 100], ["돌몸통", "무상성", 36, 95]),
-  김새우: row("물", "개울", 20, 11, 12, 7, 2, 1, 1, 1, ["시내물", "물", 40, 100], ["집게찍", "무상성", 38, 90]),
-  이슬잠자리: row("풀", "오늘 출현", 14, 12, 6, 14, 1, 1, 1, 2, ["이슬방울", "풀", 40, 100], ["잔날개", "무상성", 28, 100]),
-  햇살나비: row("풀", "오늘 출현", 16, 11, 8, 13, 2, 1, 1, 1, ["햇살가루", "풀", 42, 95], ["팔랑임", "무상성", 30, 100]),
-  안개여우: row("불", "오늘 출현", 18, 13, 7, 12, 2, 1, 1, 1, ["여우불", "불", 46, 95], ["안개숨", "무상성", 32, 100]),
+  도토: row("풀", "스타터", 22, 10, 10, 8, 2, 1, 1, 1, ["싹물어", "풀", 44, 95], ["뒹굴림", "무상성", 32, 100]),
+  가리: row("물", "스타터", 26, 8, 12, 6, 3, 1, 1, 1, ["물방울", "물", 40, 100], ["등껍질", "무상성", 34, 100]),
+  부티: row("불", "스타터", 18, 12, 8, 12, 2, 1, 1, 1, ["씨불꽃", "불", 46, 90], ["질주치", "무상성", 30, 100]),
+  두더: row("땅", "광장 풀숲", 24, 11, 11, 5, 2, 1, 1, 1, ["두더파", "땅", 48, 90], ["흙묻힘", "무상성", 34, 100]),
+  퐁이: row("물", "광장 풀숲", 18, 10, 8, 11, 2, 1, 1, 1, ["펄떡침", "물", 42, 100], ["혀채찍", "무상성", 30, 100]),
+  찔레: row("풀", "광장 풀숲", 16, 12, 7, 10, 2, 1, 1, 1, ["솔타격", "풀", 46, 90], ["부리톡", "무상성", 32, 100]),
+  재돌: row("불", "돌밭", 18, 13, 8, 9, 2, 1, 1, 1, ["잿더미", "불", 50, 85], ["재꼬리", "무상성", 34, 100]),
+  암덩: row("땅", "돌밭", 26, 9, 13, 5, 3, 1, 1, 1, ["돌구름", "땅", 42, 100], ["돌몸통", "무상성", 36, 95]),
+  송이: row("물", "개울", 20, 11, 12, 7, 2, 1, 1, 1, ["시내물", "물", 40, 100], ["집게찍", "무상성", 38, 90]),
+  이슬꽃: row("풀", "오늘 출현", 14, 12, 6, 14, 1, 1, 1, 2, ["이슬방울", "풀", 40, 100], ["잔날개", "무상성", 28, 100]),
+  햇살: row("풀", "오늘 출현", 16, 11, 8, 13, 2, 1, 1, 1, ["햇살가루", "풀", 42, 95], ["팔랑임", "무상성", 30, 100]),
+  안개불: row("불", "오늘 출현", 18, 13, 7, 12, 2, 1, 1, 1, ["여우불", "불", 46, 95], ["안개숨", "무상성", 32, 100]),
 };
 
 const TYPE_CHART = {
@@ -73,8 +73,45 @@ function row(type, habitat, hp, attack, defense, speed, hpG, attackG, defenseG, 
   };
 }
 
+function canon(species) {
+  return {
+    새싹멍: "도토",
+    방울거북: "가리",
+    불씨족제비: "부티",
+    흙두더지: "두더",
+    연못개구리: "퐁이",
+    솔방울새: "찔레",
+    잿빛도마뱀: "재돌",
+    바위너구리: "암덩",
+    김새우: "송이",
+    이슬잠자리: "이슬꽃",
+    햇살나비: "햇살",
+    안개여우: "안개불",
+  }[species] || species;
+}
+
+function migrateAccount(account) {
+  if (!account) return account;
+  for (const creature of account.party || []) creature.species = canon(creature.species);
+  if (account.battle) {
+    account.battle.foeSpecies = canon(account.battle.foeSpecies);
+    if (account.battle.pending) account.battle.pending.species = canon(account.battle.pending.species);
+  }
+  if (account.rareSeenSpecies) account.rareSeenSpecies = canon(account.rareSeenSpecies);
+  const dex = {};
+  for (const [name, status] of Object.entries(account.dex || {})) {
+    const next = canon(name);
+    if (status === "caught" || dex[next] === "caught") dex[next] = "caught";
+    else if (status === "seen" || dex[next] === "seen") dex[next] = "seen";
+    else dex[next] = dex[next] || status;
+  }
+  for (const name of SPECIES_ORDER) if (!dex[name]) dex[name] = "unseen";
+  account.dex = dex;
+  return account;
+}
+
 function stats(species, level) {
-  const base = SPECIES[species];
+  const base = SPECIES[canon(species)];
   const steps = level - 1;
   return {
     hp: base.hp + steps * base.hpG,
@@ -85,7 +122,7 @@ function stats(species, level) {
 }
 
 function creatureMove(species, index) {
-  const base = SPECIES[species];
+  const base = SPECIES[canon(species)];
   return index === 2 ? base.move2 : base.move1;
 }
 
@@ -173,11 +210,11 @@ function weightedGrass(today, rareSeen) {
 function encounterTable(tile, rareSeen) {
   if (tile === "rock") {
     return [
-      { species: "잿빛도마뱀", weight: 1 },
-      { species: "바위너구리", weight: 1 },
+      { species: "재돌", weight: 1 },
+      { species: "암덩", weight: 1 },
     ];
   }
-  if (tile === "stream") return [{ species: "김새우", weight: 1 }];
+  if (tile === "stream") return [{ species: "송이", weight: 1 }];
   if (tile === "grass") return weightedGrass(TODAY_SPECIES, rareSeen);
   return [];
 }
@@ -261,6 +298,8 @@ module.exports = {
   MAP,
   stats,
   creatureMove,
+  canon,
+  migrateAccount,
   typeMultiplier,
   damage,
   fleeChance,

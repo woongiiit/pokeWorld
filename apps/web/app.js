@@ -18,9 +18,9 @@ const TILE = {
 };
 
 const STARTERS = [
-  { species: "새싹멍", type: "풀", move1: "싹물어", move2: "뒹굴림" },
-  { species: "방울거북", type: "물", move1: "물방울", move2: "등껍질" },
-  { species: "불씨족제비", type: "불", move1: "씨불꽃", move2: "질주치" },
+  { species: "도토", type: "풀", move1: "싹물어", move2: "뒹굴림" },
+  { species: "부티", type: "불", move1: "씨불꽃", move2: "질주치" },
+  { species: "가리", type: "물", move1: "물방울", move2: "등껍질" },
 ];
 
 const STATUS = { unseen: "못 봄", seen: "만남", caught: "잡음" };
@@ -35,7 +35,7 @@ const ERROR_KO = {
   slot: "그 칸은 안 돼",
   kind: "그 행동은 안 돼",
   starter: "이미 시작했어",
-  species: "그 크리처는 안 돼",
+  species: "그 네이몬은 안 돼",
   unauthorized: "다시 들어와",
 };
 const GROUP_ORDER = ["시작", "풀숲", "돌밭", "개울", "오늘"];
@@ -54,6 +54,7 @@ let picked = null;
 let openSlot = null;
 let openDex = "";
 let nickDraft = "";
+let tutor = localStorage.getItem("pw_tutor") || "seoha";
 let remainBase = 0;
 let remainAt = 0;
 let zeroArmed = null;
@@ -117,6 +118,24 @@ function validNick(raw) {
   if (t.length < 2 || t.length > 8) return false;
   if (/\s/.test(t)) return false;
   return /^[가-힣A-Za-z0-9]+$/.test(t);
+}
+
+function tutorStep() {
+  if (tutor === "rival" || tutor === "walk") return tutor;
+  if (state?.party?.length) return "done";
+  if (tutor === "choose" || tutor === "done") return "choose";
+  return tutor || "seoha";
+}
+
+function setTutor(step) {
+  tutor = step;
+  localStorage.setItem("pw_tutor", step);
+}
+
+function rivalOf(species) {
+  if (species === "도토") return "가리";
+  if (species === "부티") return "도토";
+  return "부티";
 }
 
 function party() {
@@ -497,6 +516,7 @@ function renderJoin() {
   const ok = validNick(nickDraft) && !busy;
   return `<form class="stage" id="joinform">
       <h1>야생광장</h1>
+      <p class="sub">하림</p>
       <div class="grow"></div>
       <input class="nick" id="nick" name="nickname" maxlength="8" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="닉네임" value="${esc(nickDraft)}">
       <p class="hint">2자에서 8자</p>
@@ -504,6 +524,38 @@ function renderJoin() {
       <div class="grow"></div>
     </form>
     <div class="foot">${mainButton("입장", { disabled: !ok })}</div>
+    ${toastBox()}`;
+}
+
+function renderTalk() {
+  const second = tutorStep() === "seoha2";
+  return `<div class="stage">
+      <p class="sub">하림마을</p>
+      <h1>서하</h1>
+      <div class="grow"></div>
+      <div class="line">
+        <p>${second ? "네이몬은 자연에서 온 생물이야. 도토, 부티, 가리 중 하나를 골라." : "하림마을에 온 걸 환영해. 나는 서하야."}</p>
+      </div>
+      <div class="grow"></div>
+    </div>
+    <div class="foot">${mainButton(second ? "고르기" : "다음")}</div>
+    ${toastBox()}`;
+}
+
+function renderRival() {
+  const mine = party()[0]?.species || "네이몬";
+  const other = rivalOf(mine);
+  return `<div class="stage">
+      <p class="sub">하림마을</p>
+      <h1>민재</h1>
+      <div class="grow"></div>
+      <div class="line">
+        <p>나 민재야. 너는 ${esc(eul(mine))} 골랐구나. 나는 ${esc(other)}로 갈게.</p>
+        <p>북쪽 풀숲으로 가. 야생 네이몬을 만나면 기술이나 볼을 써.</p>
+      </div>
+      <div class="grow"></div>
+    </div>
+    <div class="foot">${mainButton("출발")}</div>
     ${toastBox()}`;
 }
 
@@ -522,13 +574,13 @@ function renderStarter() {
     extra = dialog(wa(pickedSpecies) + " 시작할까", "이 선택은 고정이야", "다시 고르기", "dialog-close", "시작", "starter-go");
   }
   return `<div class="stage">
-      <h1>함께 시작할 크리처</h1>
+      <h1>함께 갈 네이몬</h1>
       <p class="sub">한 마리만 고른다</p>
       <div class="scroll grow">${cards}</div>
     </div>
     <div class="foot">
       <p class="err">${esc(error)}</p>
-      ${overlay === "starter" ? "" : mainButton("이 크리처로 시작", { disabled: !pickedSpecies })}
+      ${overlay === "starter" ? "" : mainButton("이 네이몬으로 시작", { disabled: !pickedSpecies })}
     </div>
     ${extra}${toastBox()}`;
 }
@@ -567,6 +619,7 @@ function renderField() {
       </header>
       <div class="map">${rows}</div>
       <p class="log">${esc(oneLine(state.log))}</p>
+      ${tutorStep() === "walk" ? `<p class="hint">위쪽 풀숲으로 가. 만나면 기술이나 볼을 써.</p>` : ""}
       <div class="pad">
         ${dir("n", "위", state.y > 0)}
         <div class="pad-row">
@@ -726,7 +779,8 @@ function render() {
     html = `<div class="stage center"><p class="err">${esc(loadError || error)}</p></div>
       <div class="foot">${mainButton("다시 시도")}</div>${toastBox()}`;
   } else if (m === "join") html = renderJoin();
-  else if (m === "starter") html = renderStarter();
+  else if (m === "starter") html = tutorStep() === "choose" ? renderStarter() : renderTalk();
+  else if (m === "field" && tutorStep() === "rival") html = renderRival();
   else if (m === "battle") html = renderBattle();
   else html = renderField();
   app.innerHTML = html;
@@ -746,12 +800,28 @@ function onMain() {
     return request("/api/join", { nickname: nickDraft.trim() });
   }
   if (m === "starter") {
+    const step = tutorStep();
+    if (step === "seoha") {
+      setTutor("seoha2");
+      render();
+      return;
+    }
+    if (step === "seoha2") {
+      setTutor("choose");
+      render();
+      return;
+    }
     if (!pickedSpecies) return;
     overlay = "starter";
     render();
     return;
   }
   if (m === "field") {
+    if (tutorStep() === "rival") {
+      setTutor("walk");
+      render();
+      return;
+    }
     if (sheet) {
       sheet = null;
       render();
@@ -807,7 +877,7 @@ app.addEventListener("click", (e) => {
   }
   if (act === "starter-go") {
     if (!pickedSpecies) return;
-    return request("/api/starter", { species: pickedSpecies }, { after() { overlay = null; } });
+    return request("/api/starter", { species: pickedSpecies }, { after() { overlay = null; setTutor("rival"); } });
   }
   if (act === "open-dex") {
     sheet = "dex";
@@ -830,7 +900,7 @@ app.addEventListener("click", (e) => {
   if (act === "move") {
     if (sheet || mode() !== "field") return;
     const dir = btn.dataset.dir;
-    return request("/api/move", { dir });
+    return request("/api/move", { dir }, { after() { if (tutor === "walk") setTutor("done"); } });
   }
   if (mode() !== "battle" || frozen()) return;
   if (act === "move2") return sendAct({ kind: "move2" });
@@ -848,7 +918,7 @@ app.addEventListener("click", (e) => {
     return sendAct({ kind: "flee" });
   }
   if (act === "switch-open") {
-    if (!livingOthers().length) return toast("바꿀 크리처가 없어");
+    if (!livingOthers().length) return toast("바꿀 네이몬이 없어");
     overlay = "switch";
     picked = null;
     render();
