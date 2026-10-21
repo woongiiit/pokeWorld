@@ -207,7 +207,7 @@ function weightedGrass(today, rareSeen) {
   return RESIDENTS.map((species) => ({ species, weight: 1 }));
 }
 
-function encounterTable(tile, rareSeen) {
+function encounterTable(tile, rareSeen, today) {
   if (tile === "rock") {
     return [
       { species: "재돌", weight: 1 },
@@ -215,7 +215,7 @@ function encounterTable(tile, rareSeen) {
     ];
   }
   if (tile === "stream") return [{ species: "송이", weight: 1 }];
-  if (tile === "grass") return weightedGrass(TODAY_SPECIES, rareSeen);
+  if (tile === "grass") return weightedGrass(today === undefined ? TODAY_SPECIES : today, rareSeen);
   return [];
 }
 
@@ -239,6 +239,17 @@ function kstDayIndex(ms) {
 function midnightsBetween(lastMs, nowMs) {
   if (lastMs == null || nowMs <= lastMs) return 0;
   return kstDayIndex(nowMs) - kstDayIndex(lastMs);
+}
+
+function spawnChoices() {
+  return RESIDENTS.concat(RARES);
+}
+
+function freshToday(species, date, now) {
+  if (!species || date !== kstDate(now)) return null;
+  const name = canon(species);
+  if (!spawnChoices().includes(name)) return null;
+  return name;
 }
 
 function kstDate(ms) {
@@ -290,6 +301,8 @@ module.exports = {
   DAY_MS,
   TURN_MS,
   TODAY_SPECIES,
+  spawnChoices,
+  freshToday,
   RESIDENTS,
   RARES,
   STARTERS,

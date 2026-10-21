@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>야생광장 운영</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #d5e4e6;
+      color: #24382c;
+      font: 16px/1.45 "Malgun Gothic", sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+    h1 { font-size: 22px; margin: 0 0 12px; }
+    form, section, .panel {
+      background: #f3efe6;
+      box-shadow: inset 0 0 0 2px #c8d0d2, inset 0 0 0 4px #8d989c;
+      border-radius: 4px;
+      padding: 14px;
+      margin: 12px 0;
+    }
+    label { display: block; margin-bottom: 8px; }
+    input, select, button {
+      font: inherit;
+      color: inherit;
+    }
+    input, select { width: 100%; box-sizing: border-box; padding: 10px; }
+    button {
+      margin-top: 10px;
+      min-height: 44px;
+      padding: 0 16px;
+      background: #24382c;
+      color: #f4f6f2;
+      border: 0;
+    }
+    button.quiet { background: transparent; color: #24382c; box-shadow: inset 0 0 0 1px #8d989c; }
+    nav { display: flex; flex-wrap: wrap; gap: 6px; }
+    nav button { margin: 0; }
+    nav button.on { outline: 2px solid #f4f6f2; }
+    p { margin: 6px 0; }
+    .muted { color: #5c6758; }
+    table { width: 100%; border-collapse: collapse; }
+    td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid #c8d0d2; font-weight: 400; }
+    .err { color: #9c3418; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>야생광장 운영</h1>
+    <form id="login">
+      <label>운영 토큰 <input id="token" type="password" autocomplete="current-password"></label>
+      <button type="submit">들어가기</button>
+      <p id="login-msg" class="err"></p>
+    </form>
+    <div id="desk" hidden>
+      <nav id="menus"></nav>
+      <section id="panel"></section>
+      <button id="logout" class="quiet" type="button">나가기</button>
+    </div>
+  </main>
+  <script>
+    const login = document.querySelector("#login");
+    const desk = document.querySelector("#desk");
+    const panel = document.querySelector("#panel");
+    const menus = document.querySelector("#menus");
+    const loginMsg = document.querySelector("#login-msg");
+    let snap = null;
+    let tab = "status";
+    let timer = 0;
+
+    function text(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function clock(ms) {
+      if (!ms) return "";
+      return new Date(ms + 9 * 60 * 60 * 1000).toISOString().slice(0, 16).replace("T", " ");
+    }
+
+    async function api(path, body) {
+      const response = await fetch(path, {
+        method: body ? "POST" : "GET",
+        credentials: "same-origin",
+        headers: body ? { "content-type": "application/json" } : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(data.error || "fail");
+        error.status = response.status;
+        throw error;
+      }
+      return data;
+    }
+
+    function showLogin(message) {
+      desk.hidden = true;
+      login.hidden = false;
+      loginMsg.textContent = message || "";
+      clearInterval(timer);
+    }
+
+    function render() {
+      if (!snap) return;
+      menus.innerHTML = "";
+      for (const menu of snap.menus) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = menu.name;
+        if (menu.id === tab) button.className = "on";
+        button.addEventListener("click", () => {
+          tab = menu.id;
+          render();
+        });
+        menus.appendChild(button);
+      }
+      const menu = snap.menus.find((item) => item.id === tab) || snap.menus[0];
+      if (menu.id === "status") {
+        const live = snap.today.live ? snap.today.live : "없음";
+        panel.innerHTML = `<p>단계 ${text(snap.stage)} · ${text(snap.date)}</p>
+          <p>사람 ${text(snap.counts.players)} · 대전 ${text(snap.counts.battles)}</p>
+          <p>오늘 풀숲 ${text(live)}</p>`;
+        return;
+      }
+      if (menu.id === "spawn") {
+        const options = [`<option value="">없음</option>`].concat(
+          snap.choices.map((name) => `<option value="${text(name)}"${name === snap.today.live ? " selected" : ""}>${text(name)}</option>`),
+        );
+        const stale = snap.today.species && !snap.today.live
+          ? `<p class="muted">${text(snap.today.date)}에 고른 ${text(snap.today.species)}은 날짜가 지나 풀숲에 없다.</p>`
+          : "";
+        panel.innerHTML = `<p>오늘 풀숲에 한 종만 더한다. 자정이 지나면 비운다.</p>${stale}
+          <label>종 <select id="species">${options.join("")}</select></label>
+          <button id="save" type="button">저장</button>
+          <p id="save-msg" class="err"></p>`;
+        panel.querySelector("#save").addEventListener("click", saveSpawn);
+        return;
+      }
+      if (menu.id === "players") {
+        const rows = snap.players.map((player) => `<tr><td>${text(player.nickname)}</td><td>볼 ${text(player.balls)}</td><td>${player.started ? "시작" : "대기"}</td><td>${player.inBattle ? "대전 중" : "필드"}</td></tr>`).join("");
+        panel.innerHTML = `<table><tr><th>이름</th><th>볼</th><th>상태</th><th>자리</th></tr>${rows || "<tr><td colspan='4'>아직 없다</td></tr>"}</table>`;
+        return;
+      }
+      if (menu.id === "audit") {
+        const rows = snap.audit.map((row) => `<tr><td>${clock(row.at)}</td><td>${text(row.action)}</td><td>${text(row.value)}</td></tr>`).join("");
+        panel.innerHTML = `<table><tr><th>시각</th><th>동작</th><th>값</th></tr>${rows || "<tr><td colspan='3'>아직 없다</td></tr>"}</table>`;
+        return;
+      }
+      panel.innerHTML = `<p>${text(menu.name)}</p><p class="muted">이 단계에서는 저장이 없다.</p>`;
+    }
+
+    async function saveSpawn() {
+      const species = panel.querySelector("#species").value;
+      const msg = panel.querySelector("#save-msg");
+      try {
+        snap = await api("/admin/api/spawn", { species });
+        msg.textContent = "";
+        render();
+      } catch (error) {
+        msg.textContent = error.status === 401 ? "다시 들어가 줘." : "그 종은 오늘 출현에 없다.";
+      }
+    }
+
+    async function refresh() {
+      try {
+        const next = await api("/admin/api/snapshot");
+        const keepForm = snap && tab === "spawn" && next.today.live === snap.today.live && next.today.species === snap.today.species;
+        snap = next;
+        login.hidden = true;
+        desk.hidden = false;
+        if (!keepForm) render();
+      } catch (error) {
+        if (error.status === 401) showLogin("");
+      }
+    }
+
+    login.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      loginMsg.textContent = "";
+      try {
+        await api("/admin/login", { token: document.querySelector("#token").value });
+        document.querySelector("#token").value = "";
+        await refresh();
+        timer = setInterval(refresh, 8000);
+      } catch (error) {
+        loginMsg.textContent = error.status === 503 ? "토큰이 아직 설정되지 않았다." : "토큰이 맞지 않다.";
+      }
+    });
+
+    document.querySelector("#logout").addEventListener("click", async () => {
+      await api("/admin/logout", {}).catch(() => {});
+      snap = null;
+      showLogin("");
+    });
+
+    refresh().then(() => {
+      if (!desk.hidden) timer = setInterval(refresh, 8000);
+    });
+  </script>
+</body>
+</html>

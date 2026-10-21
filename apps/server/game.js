@@ -82,9 +82,14 @@ function settleBalls(account, now) {
   return true;
 }
 
-function rareAlreadySeen(account, now) {
-  if (!rules.RARES.includes(rules.TODAY_SPECIES)) return false;
-  return account.rareSeenDate === rules.kstDate(now) && account.rareSeenSpecies === rules.TODAY_SPECIES;
+function liveToday(today) {
+  return today === undefined ? rules.TODAY_SPECIES : today;
+}
+
+function rareAlreadySeen(account, now, today) {
+  const species = liveToday(today);
+  if (!rules.RARES.includes(species)) return false;
+  return account.rareSeenDate === rules.kstDate(now) && account.rareSeenSpecies === species;
 }
 
 function markSeen(account, species) {
@@ -114,7 +119,7 @@ function startBattle(account, species, level, now) {
   };
 }
 
-function rollEncounter(account, tile, now, rng) {
+function rollEncounter(account, tile, now, rng, today) {
   const rate = rules.encounterRate(tile);
   if (rate <= 0) return;
   if (living(account).length === 0) {
@@ -122,7 +127,7 @@ function rollEncounter(account, tile, now, rng) {
     return;
   }
   if (rng.roll(100) > rate) return;
-  const table = rules.encounterTable(tile, rareAlreadySeen(account, now));
+  const table = rules.encounterTable(tile, rareAlreadySeen(account, now, today), liveToday(today));
   const species = rules.pickWeighted(table, rng.roll(rules.weightSum(table)));
   const level = rng.roll(3) + 1;
   startBattle(account, species, level, now);
@@ -309,7 +314,7 @@ function handleStarter(account, species, now, rng) {
   return chooseStarter(account, species, now);
 }
 
-function tryMove(account, dir, now, rng) {
+function tryMove(account, dir, now, rng, today) {
   if (!account.started) return { status: 400, error: "starter" };
   if (account.battle) return { status: 400, error: "battle" };
   const delta = DIRECTIONS[dir];
@@ -329,13 +334,13 @@ function tryMove(account, dir, now, rng) {
   }
   const tile = rules.tileAt(x, y);
   if (tile === "gate") heal(account);
-  rollEncounter(account, tile, now, rng);
+  rollEncounter(account, tile, now, rng, today);
   return { status: 200 };
 }
 
-function handleMove(account, dir, now, rng) {
+function handleMove(account, dir, now, rng, today) {
   if (openRequest(account, now, rng)) return { status: 200 };
-  return tryMove(account, dir, now, rng);
+  return tryMove(account, dir, now, rng, today);
 }
 
 function actTurn(account, kind, slot, now, rng) {
@@ -422,7 +427,7 @@ function handleState(account, now, rng) {
   return { status: 200 };
 }
 
-function view(account, now) {
+function view(account, now, today) {
   const battle = account.battle
     ? {
       phase: account.battle.phase,
@@ -469,6 +474,7 @@ function view(account, now) {
     })),
     battle,
     log: account.log.slice(),
+    today: liveToday(today) || null,
   };
 }
 

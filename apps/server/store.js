@@ -12,13 +12,18 @@ function asNumber(value) {
 }
 
 function emptyData() {
-  return { accounts: {} };
+  return { accounts: {}, ops: emptyOps() };
+}
+
+function emptyOps() {
+  return { todaySpecies: null, todayDate: null, sessions: {}, audit: [] };
 }
 
 function readFileStore() {
   if (!fs.existsSync(dataFile)) return emptyData();
   const parsed = JSON.parse(fs.readFileSync(dataFile, "utf8"));
   if (!parsed || typeof parsed !== "object" || !parsed.accounts) return emptyData();
+  if (!parsed.ops) parsed.ops = emptyOps();
   return parsed;
 }
 
@@ -85,6 +90,27 @@ async function init() {
       pending_species TEXT,
       pending_level INTEGER,
       pending_hp INTEGER
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ops_state (
+      id INTEGER PRIMARY KEY,
+      today_species TEXT,
+      today_date TEXT
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      id TEXT PRIMARY KEY,
+      expires_at BIGINT NOT NULL
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS admin_audit (
+      id BIGSERIAL PRIMARY KEY,
+      at BIGINT NOT NULL,
+      action TEXT NOT NULL,
+      value TEXT
     )
   `);
 }
@@ -238,4 +264,129 @@ module.exports = {
   init,
   load,
   save,
+  loadOps,
+  listPlayers,
+  setSpawn,
+  createSession,
+  readSession,
+  dropSession,
 };
+
+async function loadOps() {
+  if (!pool) {
+    const ops = readFileStore().ops || emptyOps();
+    const now = Date.now();
+    ops.sessions = Object.fromEntries(
+      Object.entries(ops.sessions || {}).filter(([, expires]) => expires > now),
+    );
+    ops.audit = (ops.audit || []).slice(0, 40);
+    return ops;
+  }
+  const state = await pool.query("SELECT today_species, today_date FROM ops_state WHERE id = 1");
+  const sessions = await pool.query("SELECT id, expires_at FROM admin_sessions WHERE expires_at > $1", [Date.now()]);
+  const audit = await pool.query("SELECT at, action, value FROM admin_audit ORDER BY id DESC LIMIT 40");
+  const row = state.rows[0] || {};
+  const sessionMap = {};
+  for (const entry of sessions.rows) sessionMap[entry.id] = Number(entry.expires_at);
+  return {
+    todaySpecies: row.today_species || null,
+    todayDate: row.today_date || null,
+    sessions: sessionMap,
+    audit: audit.rows.map((entry) => ({
+      at: Number(entry.at),
+      action: entry.action,
+      value: entry.value,
+    })),
+  };
+}
+
+async function listPlayers() {
+  if (!pool) {
+    return Object.values(readFileStore().accounts).map((account) => ({
+      nickname: account.nickname,
+      balls: account.balls,
+      started: account.started === true,
+      inBattle: Boolean(account.battle),
+    }));
+  }
+  const rows = await pool.query(`
+    SELECT a.nickname, a.balls, a.started, (b.token IS NOT NULL) AS in_battle
+    FROM accounts a
+    LEFT JOIN battles b ON b.token = a.token
+    ORDER BY a.nickname
+  `);
+  return rows.rows.map((row) => ({
+    nickname: row.nickname,
+    balls: row.balls,
+    started: row.started === true,
+    inBattle: row.in_battle === true,
+  }));
+}
+
+async function setSpawn(species, now) {
+  const choice = species ? rules.canon(String(species)) : null;
+  if (choice && !rules.spawnChoices().includes(choice)) return { status: 400, error: "species" };
+  const date = choice ? rules.kstDate(now) : null;
+  const value = choice || "없음";
+  if (!pool) {
+    const data = readFileStore();
+    data.ops = data.ops || emptyOps();
+    data.ops.todaySpecies = choice;
+    data.ops.todayDate = date;
+    data.ops.audit = [{ at: now, action: "spawn.set", value }].concat(data.ops.audit || []).slice(0, 40);
+    writeFileStore(data);
+    return { status: 200 };
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`
+      INSERT INTO ops_state (id, today_species, today_date)
+      VALUES (1, $1, $2)
+      ON CONFLICT (id) DO UPDATE
+      SET today_species = EXCLUDED.today_species, today_date = EXCLUDED.today_date
+    `, [choice, date]);
+    await client.query(
+      "INSERT INTO admin_audit (at, action, value) VALUES ($1, 'spawn.set', $2)",
+      [now, value],
+    );
+    await client.query("COMMIT");
+    return { status: 200 };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function createSession(id, expiresAt) {
+  if (!pool) {
+    const data = readFileStore();
+    data.ops = data.ops || emptyOps();
+    data.ops.sessions = data.ops.sessions || {};
+    data.ops.sessions[id] = expiresAt;
+    writeFileStore(data);
+    return;
+  }
+  await pool.query(
+    "INSERT INTO admin_sessions (id, expires_at) VALUES ($1, $2)",
+    [id, expiresAt],
+  );
+}
+
+async function readSession(id) {
+  if (!id) return false;
+  const ops = await loadOps();
+  return (ops.sessions[id] || 0) > Date.now();
+}
+
+async function dropSession(id) {
+  if (!pool) {
+    const data = readFileStore();
+    if (data.ops && data.ops.sessions) delete data.ops.sessions[id];
+    writeFileStore(data);
+    return;
+  }
+  await pool.query("DELETE FROM admin_sessions WHERE id = $1", [id]);
+}

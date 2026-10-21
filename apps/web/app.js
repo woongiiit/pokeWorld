@@ -198,6 +198,7 @@ function normalize(s) {
     dex: s.dex || [],
     battle: null,
     log: s.log,
+    today: s.today || null,
   };
   if (s.battle) {
     const foe = s.battle.foe || {};
@@ -270,6 +271,7 @@ function snapshotSig(s) {
     dex: s.dex,
     battle,
     log: oneLine(s.log),
+    today: s.today || null,
   });
 }
 
@@ -650,6 +652,7 @@ function renderField() {
       <div class="map">${rows}</div>
       <p class="log">${esc(oneLine(state.log))}</p>
       ${tutorStep() === "walk" ? `<p class="hint">위쪽 풀숲으로 가. 만나면 기술이나 볼을 써.</p>` : ""}
+      ${state.today ? `<p class="hint">오늘 풀숲에 ${esc(state.today)}</p>` : ""}
       <div class="pad">
         ${dir("n", "위", state.y > 0)}
         <div class="pad-row">

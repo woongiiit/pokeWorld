@@ -97,6 +97,10 @@ test("오늘 출현이 비면 희귀 3종은 풀숲에 없다", () => {
     rules.weightedGrass("이슬꽃", true).map((entry) => entry.species),
     ["두더", "퐁이", "찔레"],
   );
+  const day = rules.kstDate(1_700_000_000_000);
+  assert.strictEqual(rules.freshToday("이슬꽃", day, 1_700_000_000_000), "이슬꽃");
+  assert.strictEqual(rules.freshToday("이슬꽃", day, 1_700_000_000_000 + rules.DAY_MS), null);
+  assert.strictEqual(rules.freshToday("도토", day, 1_700_000_000_000), null);
 });
 
 test("들판 칸", () => {
@@ -206,6 +210,23 @@ test("풀숲 조우 후 싹물어 피해 11", () => {
   assert.strictEqual(player.battle.foeHp, 17);
   assert.strictEqual(player.party[0].hp, 30);
   assert.strictEqual(player.battle.phase, "turn");
+});
+
+test("넘겨준 오늘 희귀는 풀숲에 한 번 나온다", () => {
+  const player = account();
+  player.x = 2;
+  player.y = 6;
+  player.lastMoveAt = 1000;
+  game.handleMove(player, "n", 2000, rules.scriptedRng([1, 4, 2]), "이슬꽃");
+  assert.strictEqual(player.battle.foeSpecies, "이슬꽃");
+  const again = account();
+  again.x = 2;
+  again.y = 6;
+  again.lastMoveAt = 1000;
+  again.rareSeenDate = rules.kstDate(2000);
+  again.rareSeenSpecies = "이슬꽃";
+  game.handleMove(again, "n", 2000, rules.scriptedRng([1, 1, 2]), "이슬꽃");
+  assert.strictEqual(again.battle.foeSpecies, "두더");
 });
 
 test("재돌은 피해 30으로 기절하고 경험치 24", () => {
