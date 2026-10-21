@@ -1,3 +1,4 @@
+// Field sprites for the twelve creatures on the current map.
 const SPRITES = {
   도토: {
     motion: "breathe",
