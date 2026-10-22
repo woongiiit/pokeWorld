@@ -144,7 +144,66 @@
       }
       if (menu.id === "players") {
         const rows = snap.players.map((player) => `<tr><td>${text(player.nickname)}</td><td>볼 ${text(player.balls)}</td><td>${player.started ? "시작" : "대기"}</td><td>${player.inBattle ? "대전 중" : "필드"}</td></tr>`).join("");
-        panel.innerHTML = `<table><tr><th>이름</th><th>볼</th><th>상태</th><th>자리</th></tr>${rows || "<tr><td colspan='4'>아직 없다</td></tr>"}</table>`;
+        panel.innerHTML = `<table><tr><th>이름</th><th>볼</th><th>상태</th><th>자리</th></tr>${rows || "<tr><td colspan='4'>아직 없다</td></tr>"}</table>
+          <label>이름 <input id="who"></label>
+          <label>볼 <input id="amount" inputmode="numeric"></label>
+          <label>볼 다시 <input id="amount2" inputmode="numeric"></label>
+          <label>사유 <input id="reason"></label>
+          <button id="grant" type="button">볼 주기</button>
+          <label>이름 다시 <input id="who2"></label>
+          <button id="midnight" type="button">자정 볼</button>
+          <label>강퇴 <select id="span"><option value="1h">1시간</option><option value="24h">24시간</option><option value="7d">7일</option></select></label>
+          <button id="kick" type="button">강퇴</button>
+          <p id="ops-msg" class="err"></p>`;
+        panel.querySelector("#grant").addEventListener("click", () => opsPost("/admin/api/balls", {
+          nickname: panel.querySelector("#who").value,
+          amount: Number(panel.querySelector("#amount").value),
+          confirm: Number(panel.querySelector("#amount2").value),
+          reason: panel.querySelector("#reason").value,
+        }));
+        panel.querySelector("#midnight").addEventListener("click", () => opsPost("/admin/api/midnight", {
+          nickname: panel.querySelector("#who").value,
+          confirm: panel.querySelector("#who2").value,
+          reason: panel.querySelector("#reason").value,
+        }));
+        panel.querySelector("#kick").addEventListener("click", () => opsPost("/admin/api/kick", {
+          nickname: panel.querySelector("#who").value,
+          duration: panel.querySelector("#span").value,
+        }));
+        return;
+      }
+      if (menu.id === "plaza") {
+        panel.innerHTML = `<p>지금 상한 ${text(snap.plazaCap)}</p>
+          <label>상한 8–40 <input id="cap" inputmode="numeric" value="${text(snap.plazaCap)}"></label>
+          <button id="save-cap" type="button">저장</button>
+          <p id="ops-msg" class="err"></p>`;
+        panel.querySelector("#save-cap").addEventListener("click", () => opsPost("/admin/api/cap", { cap: Number(panel.querySelector("#cap").value) }));
+        return;
+      }
+      if (menu.id === "battle") {
+        panel.innerHTML = `<label>이름 <input id="who"></label>
+          <button id="end" type="button">무승부</button>
+          <p class="muted">경험치와 첫 승과 포획은 없다.</p>
+          <p id="ops-msg" class="err"></p>`;
+        panel.querySelector("#end").addEventListener("click", () => opsPost("/admin/api/battle", { nickname: panel.querySelector("#who").value }));
+        return;
+      }
+      if (menu.id === "trade") {
+        const rows = (snap.trades || []).map((trade) => `<option value="${text(trade.id)}">${text(trade.a)} · ${text(trade.b)}</option>`).join("");
+        panel.innerHTML = `<label>교환 <select id="trade-id">${rows || `<option value="">없음</option>`}</select></label>
+          <label>아이디 다시 <input id="trade-confirm"></label>
+          <label>사유 <input id="reason"></label>
+          <button id="undo" type="button">되돌리기</button>
+          <p id="ops-msg" class="err"></p>`;
+        panel.querySelector("#undo").addEventListener("click", () => opsPost("/admin/api/trade", {
+          id: panel.querySelector("#trade-id").value,
+          confirm: panel.querySelector("#trade-confirm").value,
+          reason: panel.querySelector("#reason").value,
+        }));
+        return;
+      }
+      if (menu.id === "boss") {
+        panel.innerHTML = `<p>북쪽 21:00–21:15</p><p>${snap.bossOpen ? "지금 열려 있다" : "지금 닫혀 있다"}</p>`;
         return;
       }
       if (menu.id === "audit") {
@@ -153,6 +212,17 @@
         return;
       }
       panel.innerHTML = `<p>${text(menu.name)}</p><p class="muted">이 단계에서는 저장이 없다.</p>`;
+    }
+
+    async function opsPost(path, body) {
+      const msg = panel.querySelector("#ops-msg");
+      try {
+        snap = await api(path, body);
+        if (msg) msg.textContent = "";
+        render();
+      } catch (error) {
+        if (msg) msg.textContent = error.status === 401 ? "다시 들어가 줘." : "그 값은 안 된다.";
+      }
     }
 
     async function saveSpawn() {
@@ -170,7 +240,7 @@
     async function refresh() {
       try {
         const next = await api("/admin/api/snapshot");
-        const keepForm = snap && tab === "spawn" && next.today.live === snap.today.live && next.today.species === snap.today.species;
+        const keepForm = snap && ["spawn", "players", "plaza", "battle", "trade"].includes(tab);
         snap = next;
         login.hidden = true;
         desk.hidden = false;

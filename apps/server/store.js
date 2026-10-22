@@ -16,7 +16,39 @@ function emptyData() {
 }
 
 function emptyOps() {
-  return { todaySpecies: null, todayDate: null, sessions: {}, audit: [] };
+  return { todaySpecies: null, todayDate: null, sessions: {}, audit: [], plazaCap: 40, trades: [] };
+}
+
+function packMeta(account) {
+  return JSON.stringify({
+    code: account.code || null,
+    plaza: account.plaza || null,
+    bubbleText: account.bubbleText || null,
+    bubbleUntil: account.bubbleUntil || null,
+    incoming: account.incoming || null,
+    pvpWinDate: account.pvpWinDate || null,
+    bossBallDate: account.bossBallDate || null,
+    kickedUntil: account.kickedUntil || null,
+    watch: account.watch || null,
+    trade: account.trade || null,
+  });
+}
+
+function applyMeta(account, raw) {
+  let meta = {};
+  if (raw) {
+    try { meta = JSON.parse(raw); } catch { meta = {}; }
+  }
+  account.code = meta.code || null;
+  account.plaza = meta.plaza || null;
+  account.bubbleText = meta.bubbleText || null;
+  account.bubbleUntil = meta.bubbleUntil || null;
+  account.incoming = meta.incoming || null;
+  account.pvpWinDate = meta.pvpWinDate || null;
+  account.bossBallDate = meta.bossBallDate || null;
+  account.kickedUntil = meta.kickedUntil || null;
+  account.watch = meta.watch || null;
+  account.trade = meta.trade || null;
 }
 
 function readFileStore() {
@@ -113,6 +145,9 @@ async function init() {
       value TEXT
     )
   `);
+  await pool.query("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS meta TEXT");
+  await pool.query("ALTER TABLE battles ADD COLUMN IF NOT EXISTS body TEXT");
+  await pool.query("ALTER TABLE ops_state ADD COLUMN IF NOT EXISTS extra TEXT");
 }
 
 async function load(token) {
@@ -169,6 +204,10 @@ async function load(token) {
     rareSeenDate: row.rare_seen_date,
     rareSeenSpecies: row.rare_seen_species,
   };
+  applyMeta(loaded, row.meta);
+  if (battleRow && battleRow.body) {
+    try { loaded.battle = JSON.parse(battleRow.body); } catch { /* keep the column battle */ }
+  }
   return rules.migrateAccount(loaded);
 }
 
@@ -185,8 +224,8 @@ async function save(account) {
     await client.query(
       `
         INSERT INTO accounts (
-          token, nickname, balls, x, y, last_move_at, ball_settled_at, started, log, rare_seen_date, rare_seen_species
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          token, nickname, balls, x, y, last_move_at, ball_settled_at, started, log, rare_seen_date, rare_seen_species, meta
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         ON CONFLICT (token) DO UPDATE SET
           nickname = EXCLUDED.nickname,
           balls = EXCLUDED.balls,
@@ -197,7 +236,8 @@ async function save(account) {
           started = EXCLUDED.started,
           log = EXCLUDED.log,
           rare_seen_date = EXCLUDED.rare_seen_date,
-          rare_seen_species = EXCLUDED.rare_seen_species
+          rare_seen_species = EXCLUDED.rare_seen_species,
+          meta = EXCLUDED.meta
       `,
       [
         account.token,
@@ -211,6 +251,7 @@ async function save(account) {
         JSON.stringify(account.log),
         account.rareSeenDate,
         account.rareSeenSpecies,
+        packMeta(account),
       ],
     );
     await client.query("DELETE FROM party WHERE token = $1", [account.token]);
@@ -233,8 +274,8 @@ async function save(account) {
         `
           INSERT INTO battles (
             token, phase, foe_species, foe_level, foe_hp, active_slot, deadline, log,
-            pending_species, pending_level, pending_hp
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+            pending_species, pending_level, pending_hp, body
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
         `,
         [
           account.token,
@@ -248,6 +289,7 @@ async function save(account) {
           account.battle.pending ? account.battle.pending.species : null,
           account.battle.pending ? account.battle.pending.level : null,
           account.battle.pending ? account.battle.pending.hp : null,
+          JSON.stringify(account.battle),
         ],
       );
     }
@@ -264,12 +306,16 @@ module.exports = {
   init,
   load,
   save,
+  loadAll,
+  persist,
   loadOps,
+  saveOps,
   listPlayers,
   setSpawn,
   createSession,
   readSession,
   dropSession,
+  appendAudit,
 };
 
 async function loadOps() {
@@ -280,14 +326,20 @@ async function loadOps() {
       Object.entries(ops.sessions || {}).filter(([, expires]) => expires > now),
     );
     ops.audit = (ops.audit || []).slice(0, 40);
+    if (!ops.plazaCap) ops.plazaCap = 40;
+    if (!ops.trades) ops.trades = [];
     return ops;
   }
-  const state = await pool.query("SELECT today_species, today_date FROM ops_state WHERE id = 1");
+  const state = await pool.query("SELECT today_species, today_date, extra FROM ops_state WHERE id = 1");
   const sessions = await pool.query("SELECT id, expires_at FROM admin_sessions WHERE expires_at > $1", [Date.now()]);
   const audit = await pool.query("SELECT at, action, value FROM admin_audit ORDER BY id DESC LIMIT 40");
   const row = state.rows[0] || {};
   const sessionMap = {};
   for (const entry of sessions.rows) sessionMap[entry.id] = Number(entry.expires_at);
+  let extra = {};
+  if (row.extra) {
+    try { extra = JSON.parse(row.extra); } catch { extra = {}; }
+  }
   return {
     todaySpecies: row.today_species || null,
     todayDate: row.today_date || null,
@@ -297,6 +349,8 @@ async function loadOps() {
       action: entry.action,
       value: entry.value,
     })),
+    plazaCap: extra.plazaCap || 40,
+    trades: extra.trades || [],
   };
 }
 
@@ -379,6 +433,152 @@ async function readSession(id) {
   if (!id) return false;
   const ops = await loadOps();
   return (ops.sessions[id] || 0) > Date.now();
+}
+
+async function loadAll() {
+  if (!pool) {
+    return Object.values(readFileStore().accounts).map((row) => rules.migrateAccount(JSON.parse(JSON.stringify(row))));
+  }
+  const accounts = await pool.query("SELECT token FROM accounts");
+  const all = [];
+  for (const row of accounts.rows) {
+    const loaded = await load(row.token);
+    if (loaded) all.push(loaded);
+  }
+  return all;
+}
+
+async function saveOps(ops) {
+  if (!pool) return;
+  const extra = JSON.stringify({ plazaCap: ops.plazaCap || 40, trades: ops.trades || [] });
+  await pool.query(`
+    INSERT INTO ops_state (id, today_species, today_date, extra)
+    VALUES (1, $1, $2, $3)
+    ON CONFLICT (id) DO UPDATE SET
+      today_species = EXCLUDED.today_species,
+      today_date = EXCLUDED.today_date,
+      extra = EXCLUDED.extra
+  `, [ops.todaySpecies || null, ops.todayDate || null, extra]);
+}
+
+async function persist(all, ops) {
+  if (!pool) {
+    const data = readFileStore();
+    for (const account of all) {
+      if (!account.dirty) continue;
+      delete account.dirty;
+      data.accounts[account.token] = account;
+    }
+    data.ops = data.ops || emptyOps();
+    data.ops.todaySpecies = ops.todaySpecies;
+    data.ops.todayDate = ops.todayDate;
+    data.ops.audit = ops.audit;
+    data.ops.plazaCap = ops.plazaCap || 40;
+    data.ops.trades = ops.trades || [];
+    writeFileStore(data);
+    return;
+  }
+  for (const account of all) {
+    if (!account.dirty) continue;
+    delete account.dirty;
+    await save(account);
+  }
+  if (ops) await saveOps(ops);
+}
+
+async function appendAudit(row) {
+  if (!pool) {
+    const data = readFileStore();
+    data.ops = data.ops || emptyOps();
+    data.ops.audit = [row].concat(data.ops.audit || []).slice(0, 40);
+    writeFileStore(data);
+    return;
+  }
+  await pool.query(
+    "INSERT INTO admin_audit (at, action, value) VALUES ($1, $2, $3)",
+    [row.at, row.action, row.value],
+  );
+}
+
+function oneAccount(data, nickname) {
+  const found = Object.values(data.accounts).filter((account) => account.nickname === nickname);
+  if (found.length !== 1) return null;
+  return found[0];
+}
+
+async function grantBalls(nickname, amount, reason, now) {
+  const audit = { at: now, action: "ball.grant", value: `${nickname} +${amount} ${reason}` };
+  if (!pool) {
+    const data = readFileStore();
+    const account = oneAccount(data, nickname);
+    if (!account) return { status: 400, error: "player" };
+    account.balls = Math.min(30, account.balls + amount);
+    data.ops = data.ops || emptyOps();
+    data.ops.audit = [audit].concat(data.ops.audit || []).slice(0, 40);
+    writeFileStore(data);
+    return { status: 200 };
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const updated = await client.query(
+      "UPDATE accounts SET balls = LEAST(30, balls + $2) WHERE nickname = $1 RETURNING nickname",
+      [nickname, amount],
+    );
+    if (updated.rowCount !== 1) {
+      await client.query("ROLLBACK");
+      return { status: 400, error: "player" };
+    }
+    await client.query(
+      "INSERT INTO admin_audit (at, action, value) VALUES ($1, $2, $3)",
+      [audit.at, audit.action, audit.value],
+    );
+    await client.query("COMMIT");
+    return { status: 200 };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function midnightBalls(nickname, reason, now) {
+  const audit = { at: now, action: "ball.midnight", value: `${nickname} ${reason}` };
+  if (!pool) {
+    const data = readFileStore();
+    const account = oneAccount(data, nickname);
+    if (!account) return { status: 400, error: "player" };
+    account.balls = Math.min(30, account.balls + 3);
+    account.ballSettledAt = now;
+    data.ops = data.ops || emptyOps();
+    data.ops.audit = [audit].concat(data.ops.audit || []).slice(0, 40);
+    writeFileStore(data);
+    return { status: 200 };
+  }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const updated = await client.query(
+      "UPDATE accounts SET balls = LEAST(30, balls + 3), ball_settled_at = $2 WHERE nickname = $1 RETURNING nickname",
+      [nickname, now],
+    );
+    if (updated.rowCount !== 1) {
+      await client.query("ROLLBACK");
+      return { status: 400, error: "player" };
+    }
+    await client.query(
+      "INSERT INTO admin_audit (at, action, value) VALUES ($1, $2, $3)",
+      [audit.at, audit.action, audit.value],
+    );
+    await client.query("COMMIT");
+    return { status: 200 };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function dropSession(id) {

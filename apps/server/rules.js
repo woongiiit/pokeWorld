@@ -3,6 +3,12 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const TURN_MS = 20000;
 
 const TODAY_SPECIES = null;
+const BUBBLES = ["안녕", "이쪽이야", "풀숲 가자", "한 판 하자", "좋아", "잠깐", "보스 대기", "잘 가"];
+const BUBBLE_MS = 3000;
+const PLAZA_CAP = 40;
+const PVP_BONUS_EXP = 24;
+const BOSS_BALLS = 5;
+const TRADE_CANCEL_MS = 10000;
 
 const RESIDENTS = ["두더", "퐁이", "찔레"];
 const RARES = ["이슬꽃", "햇살", "안개불"];
@@ -252,6 +258,12 @@ function freshToday(species, date, now) {
   return name;
 }
 
+function bossWindow(ms) {
+  const shifted = new Date(ms + KST_OFFSET_MS);
+  const minutes = shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+  return minutes >= 21 * 60 && minutes < 21 * 60 + 15;
+}
+
 function kstDate(ms) {
   const shifted = new Date(ms + KST_OFFSET_MS);
   const month = String(shifted.getUTCMonth() + 1).padStart(2, "0");
@@ -301,6 +313,13 @@ module.exports = {
   DAY_MS,
   TURN_MS,
   TODAY_SPECIES,
+  BUBBLES,
+  BUBBLE_MS,
+  PLAZA_CAP,
+  PVP_BONUS_EXP,
+  BOSS_BALLS,
+  TRADE_CANCEL_MS,
+  bossWindow,
   spawnChoices,
   freshToday,
   RESIDENTS,

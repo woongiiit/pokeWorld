@@ -1,5 +1,11 @@
 const rules = require("./rules");
 
+let rosterHook = () => [];
+
+function setRosterHook(fn) {
+  rosterHook = typeof fn === "function" ? fn : () => [];
+}
+
 const DIRECTIONS = {
   n: [0, -1],
   s: [0, 1],
@@ -116,7 +122,38 @@ function startBattle(account, species, level, now) {
     deadline: now + rules.TURN_MS,
     log: [],
     pending: null,
+    kind: "wild",
+    cheer: 0,
   };
+}
+
+function startBoss(account, roster, now) {
+  const date = rules.kstDate(now);
+  const mates = (roster || []).filter((other) => (
+    other.battle
+    && other.battle.kind === "boss"
+    && other.battle.bossDate === date
+    && other.plaza === account.plaza
+    && other.token !== account.token
+  ));
+  if (mates.length >= 4) {
+    account.log = account.log.concat(["북쪽은 가득 찼어"]).slice(-40);
+    return { status: 200 };
+  }
+  startBattle(account, "암덩", 20, now);
+  account.battle.kind = "boss";
+  account.battle.bossDate = date;
+  if (mates.length > 0) {
+    account.battle.foeHp = Math.min(...mates.map((other) => other.battle.foeHp));
+  }
+  const seats = mates.length + 1;
+  account.battle.keepers = Array.from({ length: Math.max(0, 4 - seats) }, () => "광장지기");
+  return { status: 200 };
+}
+
+function endBoss(account) {
+  if (!account.battle || account.battle.kind !== "boss") return;
+  endBattle(account, "북쪽");
 }
 
 function rollEncounter(account, tile, now, rng, today) {
@@ -204,6 +241,10 @@ function resolveMoves(account, kind, now, rng) {
     if (killed) break;
   }
   if (account.battle.foeHp <= 0) {
+    if (account.battle.kind === "boss") {
+      account.battle.phase = "down";
+      return;
+    }
     const winner = activeCreature(account);
     rules.applyExp(winner, rules.expGain(account.battle.foeLevel));
     endBattle(account, "승리");
@@ -334,6 +375,10 @@ function tryMove(account, dir, now, rng, today) {
   }
   const tile = rules.tileAt(x, y);
   if (tile === "gate") heal(account);
+  if (x === 2 && y === 0 && rules.bossWindow(now)) {
+    startBoss(account, rosterHook(), now);
+    return { status: 200 };
+  }
   rollEncounter(account, tile, now, rng, today);
   return { status: 200 };
 }
@@ -359,6 +404,9 @@ function actTurn(account, kind, slot, now, rng) {
     wildAttack(account, now, rng);
     return { status: 200 };
   }
+  if ((kind === "ball" || kind === "flee") && account.battle.kind && account.battle.kind !== "wild") {
+    return { status: 400, error: "kind" };
+  }
   if (kind === "flee") {
     const active = activeCreature(account);
     const chance = rules.fleeChance(
@@ -378,7 +426,7 @@ function actTurn(account, kind, slot, now, rng) {
     if (account.battle.foeHp < 1) return { status: 400, error: "balls" };
     account.balls -= 1;
     const maxHp = rules.stats(account.battle.foeSpecies, account.battle.foeLevel).hp;
-    const chance = rules.captureChance(account.battle.foeHp, maxHp, 0);
+    const chance = rules.captureChance(account.battle.foeHp, maxHp, account.battle.cheer || 0);
     if (rng.roll(100) <= chance) {
       catchSuccess(account, now);
       return { status: 200 };
@@ -427,7 +475,16 @@ function handleState(account, now, rng) {
   return { status: 200 };
 }
 
-function view(account, now, today) {
+function publicTrade(account, now) {
+  if (!account.trade) return null;
+  return {
+    phase: account.trade.phase,
+    other: account.trade.other,
+    remainMs: Math.max(0, (account.trade.until || 0) - now),
+  };
+}
+
+function view(account, now, today, extras) {
   const battle = account.battle
     ? {
       phase: account.battle.phase,
@@ -441,6 +498,9 @@ function view(account, now, today) {
       activeSlot: account.battle.activeSlot,
       remainMs: Math.max(0, account.battle.deadline - now),
       log: account.battle.log.slice(),
+      kind: account.battle.kind || "wild",
+      cheered: (account.battle.cheer || 0) > 0,
+      keepers: account.battle.keepers || [],
     }
     : null;
   return {
@@ -475,6 +535,13 @@ function view(account, now, today) {
     battle,
     log: account.log.slice(),
     today: liveToday(today) || null,
+    code: account.code || "",
+    others: extras && extras.others ? extras.others : [],
+    incoming: account.incoming && account.incoming.until > now
+      ? { kind: account.incoming.kind, from: account.incoming.from }
+      : null,
+    trade: publicTrade(account, now),
+    bubble: account.bubbleUntil > now ? account.bubbleText : "",
   };
 }
 
@@ -487,4 +554,7 @@ module.exports = {
   handleState,
   view,
   settleBalls,
+  setRosterHook,
+  endBoss,
+  endBattle,
 };

@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const rules = require("./rules");
 const game = require("./game");
 const store = require("./store");
+const plaza = require("./plaza");
 
 const port = Number(process.env.PORT) || 3000;
 const webRoot = path.resolve(__dirname, "..", "web");
@@ -81,17 +82,20 @@ function newToken() {
   return crypto.randomBytes(24).toString("hex");
 }
 
-const STAGE = 2;
+const STAGE = 5;
 const MENUS = [
   { id: "status", name: "현황", save: false },
   { id: "spawn", name: "출현", save: true },
-  { id: "players", name: "플레이어", save: false },
-  { id: "plaza", name: "광장", save: false },
-  { id: "battle", name: "대전", save: false },
-  { id: "trade", name: "교환", save: false },
+  { id: "players", name: "플레이어", save: true },
+  { id: "plaza", name: "광장", save: true },
+  { id: "battle", name: "대전", save: true },
+  { id: "trade", name: "교환", save: true },
   { id: "boss", name: "보스", save: false },
   { id: "audit", name: "기록", save: false },
 ];
+
+let room = [];
+let liveOps = null;
 
 function cookieValue(req, name) {
   const raw = req.headers.cookie || "";
@@ -154,11 +158,42 @@ async function snapshot(now) {
     players,
     audit: ops.audit,
     menus: MENUS,
+    plazaCap: ops.plazaCap || 40,
+    bossOpen: rules.bossWindow(now),
+    trades: (ops.trades || []).map((trade) => ({
+      id: trade.id,
+      at: trade.at,
+      a: trade.a.nickname,
+      b: trade.b.nickname,
+    })),
   };
 }
 
-function payload(account, now, result, today) {
-  const body = { state: game.view(account, now, today) };
+function reasonOk(text) {
+  return typeof text === "string" && text.trim().length >= 8 && text.trim().length <= 120;
+}
+
+function payload(account, all, now, result, today) {
+  const state = game.view(account, now, today, { others: plaza.visible(account, all, now) });
+  if (account.watch) {
+    const host = all.find((other) => other.battle && other.battle.duelId === account.watch);
+    if (host && host.battle) {
+      const seen = game.view(host, now, today);
+      state.battle = seen.battle;
+      state.battle.watch = true;
+      const mate = host.party.find((creature) => creature.slot === host.battle.activeSlot);
+      if (mate) {
+        state.battle.mate = {
+          species: mate.species,
+          type: rules.SPECIES[mate.species].type,
+          level: mate.level,
+          hp: mate.hp,
+          maxHp: rules.stats(mate.species, mate.level).hp,
+        };
+      }
+    }
+  }
+  const body = { state };
   if (result.status !== 200 && result.error) body.error = result.error;
   return body;
 }
@@ -175,17 +210,28 @@ async function withAccount(req, res, fn) {
     return;
   }
   await enqueue(async () => {
-    const account = await store.load(token);
+    room = await store.loadAll();
+    const account = room.find((item) => item.token === token);
     if (!account) {
       send(res, 401, { error: "unauthorized" });
       return;
     }
     const now = Date.now();
-    const today = await currentToday(now);
+    if (account.kickedUntil > now) {
+      send(res, 403, { error: "kick" });
+      return;
+    }
+    liveOps = await store.loadOps();
+    plaza.prepare(account, room);
+    game.setRosterHook(() => room);
     const rng = rules.defaultRng();
+    plaza.tick(room, now, rng, liveOps.trades);
+    const today = rules.freshToday(liveOps.todaySpecies, liveOps.todayDate, now);
     const result = fn(account, now, rng, today);
-    await store.save(account);
-    send(res, result.status, payload(account, now, result, today));
+    plaza.tick(room, now, rng, liveOps.trades);
+    account.dirty = true;
+    await store.persist(room, liveOps);
+    send(res, result.status, payload(account, room, now, result, today));
   });
 }
 
@@ -244,10 +290,14 @@ async function handle(req, res) {
           return;
         }
         const now = Date.now();
-        const today = await currentToday(now);
+        const ops = await store.loadOps();
+        const all = await store.loadAll();
+        const today = rules.freshToday(ops.todaySpecies, ops.todayDate, now);
         const account = game.createAccount({ token: newToken(), nickname });
-        await store.save(account);
-        send(res, 200, { token: account.token, state: game.view(account, now, today) });
+        plaza.prepare(account, all);
+        account.dirty = true;
+        await store.persist(all.concat(account), ops);
+        send(res, 200, { token: account.token, state: game.view(account, now, today, { others: [] }) });
       });
       return;
     }
@@ -267,7 +317,50 @@ async function handle(req, res) {
     }
     if (req.method === "POST" && urlPath === "/api/act") {
       const body = await readJson(req);
-      await withAccount(req, res, (account, now, rng) => game.handleAct(account, body, now, rng));
+      await withAccount(req, res, (account, now, rng) => {
+        if (account.battle && account.battle.kind === "pvp") return plaza.actPvp(account, room, body, now);
+        return game.handleAct(account, body, now, rng);
+      });
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/api/plaza") {
+      const body = await readJson(req);
+      await withAccount(req, res, (account) => plaza.joinPlaza(account, room, String(body.code || ""), liveOps.plazaCap));
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/api/say") {
+      const body = await readJson(req);
+      await withAccount(req, res, (account, now) => plaza.say(account, room, body.text, now));
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/api/duel") {
+      const body = await readJson(req);
+      await withAccount(req, res, (account, now) => (
+        body.accept === undefined
+          ? plaza.askDuel(account, room, body.nickname, now)
+          : plaza.answerDuel(account, room, body.accept === true, now)
+      ));
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/api/cheer") {
+      const body = await readJson(req);
+      await withAccount(req, res, (account) => plaza.cheer(account, room, body.nickname));
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/api/watch") {
+      const body = await readJson(req);
+      await withAccount(req, res, (account) => (
+        body.leave ? plaza.leaveWatch(account) : plaza.watch(account, room, body.nickname)
+      ));
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/api/trade") {
+      const body = await readJson(req);
+      await withAccount(req, res, (account, now) => {
+        if (body.cancel) return plaza.cancelTrade(account, room);
+        if (body.nickname) return plaza.offerTrade(account, room, body.nickname, body.slot, now);
+        return plaza.answerTrade(account, room, body.slot, now);
+      });
       return;
     }
     if (req.method === "GET" && (urlPath === "/admin" || urlPath === "/admin/")) {
@@ -320,6 +413,135 @@ async function handle(req, res) {
       }
       const snap = await enqueue(() => snapshot(Date.now()));
       send(res, 200, snap);
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/admin/api/balls") {
+      if (!(await store.readSession(cookieValue(req, "pw_admin")))) {
+        send(res, 401, { error: "unauthorized" });
+        return;
+      }
+      const body = await readJson(req);
+      const amount = Number(body.amount);
+      if (!reasonOk(body.reason) || amount !== Number(body.confirm) || !Number.isInteger(amount) || amount < 1 || amount > 30) {
+        send(res, 400, { error: "reason" });
+        return;
+      }
+      const result = await enqueue(() => store.grantBalls(body.nickname, amount, body.reason.trim(), Date.now()));
+      send(res, result.status, result.status === 200 ? await enqueue(() => snapshot(Date.now())) : { error: result.error });
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/admin/api/midnight") {
+      if (!(await store.readSession(cookieValue(req, "pw_admin")))) {
+        send(res, 401, { error: "unauthorized" });
+        return;
+      }
+      const body = await readJson(req);
+      if (!reasonOk(body.reason) || body.nickname !== body.confirm) {
+        send(res, 400, { error: "reason" });
+        return;
+      }
+      const result = await enqueue(() => store.midnightBalls(body.nickname, body.reason.trim(), Date.now()));
+      send(res, result.status, result.status === 200 ? await enqueue(() => snapshot(Date.now())) : { error: result.error });
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/admin/api/cap") {
+      if (!(await store.readSession(cookieValue(req, "pw_admin")))) {
+        send(res, 401, { error: "unauthorized" });
+        return;
+      }
+      const body = await readJson(req);
+      const cap = Number(body.cap);
+      if (!Number.isInteger(cap) || cap < 8 || cap > 40) {
+        send(res, 400, { error: "cap" });
+        return;
+      }
+      await enqueue(async () => {
+        const ops = await store.loadOps();
+        ops.plazaCap = cap;
+        ops.audit = [{ at: Date.now(), action: "plaza.cap", value: String(cap) }].concat(ops.audit || []).slice(0, 40);
+        await store.persist([], ops);
+        if (process.env.DATABASE_URL) await store.appendAudit(ops.audit[0]);
+      });
+      send(res, 200, await enqueue(() => snapshot(Date.now())));
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/admin/api/kick") {
+      if (!(await store.readSession(cookieValue(req, "pw_admin")))) {
+        send(res, 401, { error: "unauthorized" });
+        return;
+      }
+      const body = await readJson(req);
+      const span = { "1h": 3600000, "24h": 86400000, "7d": 7 * 86400000 }[body.duration];
+      if (!span) {
+        send(res, 400, { error: "kick" });
+        return;
+      }
+      const result = await enqueue(async () => {
+        const all = await store.loadAll();
+        const found = all.filter((account) => account.nickname === body.nickname);
+        if (found.length !== 1) return { status: 400, error: "player" };
+        const now = Date.now();
+        plaza.kick(found[0], all, now + span);
+        const ops = await store.loadOps();
+        await store.persist(all, ops);
+        await store.appendAudit({ at: now, action: "player.kick", value: `${body.nickname} ${body.duration}` });
+        return { status: 200 };
+      });
+      send(res, result.status, result.status === 200 ? await enqueue(() => snapshot(Date.now())) : { error: result.error });
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/admin/api/battle") {
+      if (!(await store.readSession(cookieValue(req, "pw_admin")))) {
+        send(res, 401, { error: "unauthorized" });
+        return;
+      }
+      const body = await readJson(req);
+      const result = await enqueue(async () => {
+        const all = await store.loadAll();
+        const found = all.filter((account) => account.nickname === body.nickname && account.battle);
+        if (found.length !== 1) return { status: 400, error: "player" };
+        const now = Date.now();
+        const account = found[0];
+        if (account.battle.kind === "pvp") {
+          const foe = all.find((other) => other.battle && other.battle.duelId === account.battle.duelId);
+          plaza.drawBattle(account);
+          if (foe) plaza.drawBattle(foe);
+        } else {
+          plaza.drawBattle(account);
+        }
+        const ops = await store.loadOps();
+        await store.persist(all, ops);
+        await store.appendAudit({ at: now, action: "battle.end", value: body.nickname });
+        return { status: 200 };
+      });
+      send(res, result.status, result.status === 200 ? await enqueue(() => snapshot(Date.now())) : { error: result.error });
+      return;
+    }
+    if (req.method === "POST" && urlPath === "/admin/api/trade") {
+      if (!(await store.readSession(cookieValue(req, "pw_admin")))) {
+        send(res, 401, { error: "unauthorized" });
+        return;
+      }
+      const body = await readJson(req);
+      if (!reasonOk(body.reason) || body.id !== body.confirm) {
+        send(res, 400, { error: "reason" });
+        return;
+      }
+      const result = await enqueue(async () => {
+        const ops = await store.loadOps();
+        const record = (ops.trades || []).find((trade) => trade.id === body.id);
+        const all = await store.loadAll();
+        const undone = plaza.undoTrade(all, record);
+        if (undone.status !== 200) return undone;
+        ops.trades = ops.trades.filter((trade) => trade.id !== body.id);
+        const now = Date.now();
+        const audit = { at: now, action: "trade.undo", value: `${body.id} ${body.reason.trim()}` };
+        ops.audit = [audit].concat(ops.audit || []).slice(0, 40);
+        await store.persist(all, ops);
+        if (process.env.DATABASE_URL) await store.appendAudit(audit);
+        return { status: 200 };
+      });
+      send(res, result.status, result.status === 200 ? await enqueue(() => snapshot(Date.now())) : { error: result.error });
       return;
     }
     if (req.method === "GET") {
