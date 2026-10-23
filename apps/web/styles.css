@@ -129,6 +129,31 @@ h1 {
   font-size: 14px;
 }
 
+.sound {
+  min-height: 32px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.sound.off {
+  color: var(--muted);
+  background: transparent;
+  border-style: dashed;
+}
+
+.topline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.topline h1 { margin-top: 8px; }
+
 .tag {
   max-width: 8em;
   overflow: hidden;

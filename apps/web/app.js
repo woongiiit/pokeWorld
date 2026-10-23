@@ -168,6 +168,33 @@ function mode() {
   return "field";
 }
 
+function battleTrack(s) {
+  const kind = s?.battle?.kind || "wild";
+  return kind === "boss" ? "boss" : kind === "pvp" ? "duel" : "wild";
+}
+
+function trackFor(m) {
+  if (m === "battle") return battleTrack(state);
+  if (m === "field" && tutorStep() !== "rival") return "route";
+  return "town";
+}
+
+function cueBattle(prev, next) {
+  if (!window.Sound) return;
+  if (prev && !prev.battle && next.battle) {
+    Sound.jingle("encounter", battleTrack(next));
+    return;
+  }
+  if (prev?.battle && !next.battle) {
+    const last = oneLine(next.log);
+    if (last === "포획") Sound.jingle("catch", "route");
+    else if (last === "승리" || last === "북쪽") Sound.jingle("win", "route");
+    else if (last === "패배") Sound.jingle("lose", "route");
+    return;
+  }
+  if (prev && !prev.incoming && next.incoming) Sound.sfx("ping");
+}
+
 function remainLeft() {
   if (!state?.battle) return 0;
   return Math.max(0, remainBase - (Date.now() - remainAt));
@@ -319,6 +346,7 @@ function applyState(raw, opts) {
   const same = snapshotSig(next) === snapshotSig(prev);
   const phaseChanged = !prev?.battle || !next.battle || prev.battle.phase !== next.battle.phase;
   noteZero(next);
+  cueBattle(prev, next);
   state = next;
   if (next.battle) {
     remainBase = next.battle.remainMs;
@@ -578,7 +606,7 @@ function toastBox() {
 function renderJoin() {
   const ok = validNick(nickDraft) && !busy;
   return `<form class="stage" id="joinform">
-      <h1>야생광장</h1>
+      <div class="topline"><h1>야생광장</h1>${soundButton()}</div>
       <p class="sub">하림</p>
       <div class="grow"></div>
       <input class="nick" id="nick" name="nickname" maxlength="8" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" placeholder="닉네임" value="${esc(nickDraft)}">
@@ -727,6 +755,7 @@ function renderField() {
         <button type="button" class="textbtn" data-act="open-code">코드 ${esc(state.code || "")}</button>
         <span>볼 ${num(state.balls)}</span>
         <span>${num(state.x)},${num(state.y)} ${esc(tileName(state.tile))}</span>
+        ${soundButton()}
       </header>
       <div class="map">${rows}</div>
       <p class="log">${esc(oneLine(state.log))}</p>
@@ -879,8 +908,14 @@ function renderBattle() {
     ${dialogHtml}${toastBox()}`;
 }
 
+function soundButton() {
+  const on = window.Sound ? Sound.on : false;
+  return `<button type="button" class="textbtn sound${on ? "" : " off"}" data-act="sound" aria-label="${on ? "소리 끄기" : "소리 켜기"}">${on ? "♪" : "♪ 끔"}</button>`;
+}
+
 function render() {
   const m = mode();
+  if (window.Sound) Sound.want(trackFor(m));
   if (m === "join" && app.dataset.mode === "join") {
     const nick = document.getElementById("nick");
     const err = app.querySelector(".err");
@@ -982,6 +1017,12 @@ app.addEventListener("click", (e) => {
   if (btn.dataset.act === "scrim" && e.target !== btn) return;
   if (btn.disabled || busy) return;
   const act = btn.dataset.act;
+  if (act === "sound") {
+    if (window.Sound) Sound.toggle();
+    for (const el of app.querySelectorAll("[data-act=sound]")) el.outerHTML = soundButton();
+    return;
+  }
+  if (window.Sound && act !== "scrim") Sound.sfx("blip");
   if (act === "main") return onMain();
   if (act === "pick-species") {
     pickedSpecies = btn.dataset.species || "";
