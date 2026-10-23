@@ -1,360 +1,94 @@
-// Field sprites for the twelve creatures on the current map.
-const SPRITES = {
-  도토: {
-    motion: "breathe",
-    colors: { o: "#3a2618", b: "#6d4328", g: "#8fbf45", e: "#1a120c" },
-    frames: [[
-      "....o......o....",
-      "...obo....obo...",
-      "...o.o....o.o...",
-      "....obbbbbbo....",
-      "...oggbbbbggo...",
-      "..oggebbbbeggo..",
-      "...oggbbbbggo...",
-      "....obbbbbbo....",
-      ".....obbbbo.....",
-      "....obbbbbbo....",
-      "...obbbbbbbbo...",
-      "....obbbbbbo....",
-      ".....oo..oo.....",
-      "......o..o......",
-      "......oooo......",
-      "................",
-    ]],
-  },
-  부티: {
-    motion: "hop",
-    colors: { o: "#3a2a18", b: "#e2c99a", y: "#e07a2f", e: "#1a120c", d: "#3a2a18" },
-    frames: [[
-      "................",
-      "......y..y......",
-      ".....oyooyo.....",
-      "......o..o......",
-      ".....obbbbo.....",
-      "....obeeeebo....",
-      "...obbbbbbbo....",
-      "....obbbbbbo....",
-      ".....obbbbbo....",
-      "..dd...o..o.....",
-      "..oo..bo..ob....",
-      "......o....o....",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  가리: {
-    motion: "breathe",
-    colors: { o: "#1d3d4a", b: "#7eb8c4", n: "#1a3a6b" },
-    frames: [[
-      "................",
-      ".......oo.......",
-      "......obbo......",
-      ".....obbbbo.....",
-      "....obbbbbbo....",
-      "...obbbbbbbbo...",
-      "..obbbbbbbbbbo..",
-      "..obbbnnnnbbbo..",
-      "...obbnnnnbbo...",
-      "....obbbbbbo....",
-      ".....obbbbo.....",
-      "......obbo......",
-      ".......oo.......",
-      "........o.......",
-      "................",
-      "................",
-    ]],
-  },
-  두더: {
-    motion: "hop",
-    colors: { o: "#3a2a1c", b: "#6a4a32", e: "#1a120c", n: "#e7a0a8", p: "#8a6244" },
-    frames: [[
-      "................",
-      "......oooo......",
-      ".....obbbbo.....",
-      "....obeeeebo....",
-      "....obbbbbbo....",
-      "...oobbbbbooo...",
-      "..obbbbbbbbbbo..",
-      "..obbnnbbbbbbo..",
-      "...obbbbbbbbo...",
-      "..ooppppppppoo..",
-      ".ooppppppppppoo.",
-      "..oo........oo..",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  퐁이: {
-    motion: "breathe",
-    colors: { o: "#1e3c34", b: "#3e8f78", s: "#e6d3b0" },
-    frames: [[
-      "................",
-      "......ooo.......",
-      ".....obbbbo.....",
-      "......ooo.......",
-      "....obbbbbbo....",
-      "...obbbbbbbbo...",
-      "..obbbbbbbbbbo..",
-      "..obbsssssbbbo..",
-      "...obbbbbbbbo...",
-      "....obbbbbbo....",
-      ".....o....o.....",
-      "....bo....ob....",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  찔레: {
-    motion: "breathe",
-    colors: { o: "#1e3a22", b: "#2f6b38", y: "#c4a15a" },
-    frames: [[
-      "................",
-      "....y......y....",
-      "...oyo....oyo...",
-      "....o......o....",
-      "...yobbbboby....",
-      "..oyobbbbbboyo..",
-      "...obbbbbbbbo...",
-      "..yobbbbbbboby..",
-      "...obbbbbbbbo...",
-      "....oyoboboyo...",
-      ".....o....o.....",
-      "......o..o......",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  재돌: {
-    motion: "breathe",
-    colors: { o: "#3a3a3a", b: "#8d8a86", r: "#c4502a" },
-    frames: [[
-      "................",
-      "....oooooooo....",
-      "...obbbbbbbbbo..",
-      "..obbbbbbbbbbbo.",
-      "..obbbbbbbbbbbo.",
-      "...obbbrbbbbbo..",
-      "..obbbbrbbbbbbo.",
-      "...obbbbbbbbbo..",
-      "....obbbbbbbo...",
-      ".....oooooo.....",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  암덩: {
-    motion: "breathe",
-    colors: { o: "#4a3a28", b: "#b08960", g: "#5f8f45" },
-    frames: [[
-      "................",
-      ".....ooooooo....",
-      "....obbbbbbbbo..",
-      "...obbbbbbbbbbo.",
-      "..obbbbbbbbbbbbo",
-      "..obgggbbbbbbbbo",
-      "..obgggbbbbbbbbo",
-      "...obbbbbbbbbbo.",
-      "....obbbbbbbbo..",
-      ".....oooooooo...",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  송이: {
-    motion: "wag",
-    colors: { o: "#2a3a44", b: "#d5e4ea", e: "#1a120c", k: "#243038" },
-    frames: [[
-      "................",
-      "................",
-      "................",
-      "................",
-      ".....ooooooo....",
-      "...ooobbbbbboo..",
-      "..obbbbbbbbbbbo.",
-      ".obbbbbbebbbbbbo",
-      "..obkkkkkkkkkbbo",
-      "..obbbbbbbbbbbo.",
-      "...ooobbbbbboo..",
-      ".....ooooooo....",
-      "................",
-      "................",
-      "................",
-      "................",
-    ], [
-      "................",
-      "................",
-      "................",
-      ".....ooooooo....",
-      "...ooobbbbbboo..",
-      ".oobbbbbbbbbbbo.",
-      "..obbbbbbebbbbbo",
-      "..obkkkkkkkkkbbo",
-      "..obbbbbbbbbbbo.",
-      "...ooobbbbbboo..",
-      ".....ooooooo....",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  이슬꽃: {
-    motion: "hop",
-    colors: { o: "#3a4a32", p: "#b9a0d4", y: "#e6d36a", w: "#f7f7f2" },
-    frames: [[
-      "................",
-      "......o..o......",
-      ".....oyyyyo.....",
-      "....oppppppo....",
-      "...opppwppppo...",
-      "....oppppppo....",
-      ".....oyyyyo.....",
-      "......oooo......",
-      ".......oo.......",
-      "........o.......",
-      "........o.......",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  햇살: {
-    motion: "wag",
-    colors: { o: "#5a4a20", b: "#3a3218", y: "#f0c43a", w: "#fff6c2", e: "#1a120c" },
-    frames: [[
-      "................",
-      ".wwww......wwww.",
-      ".wyyyyw..wyyyyw.",
-      ".wyyyyyyyyyyyyw.",
-      "..wyyyyyyyyyyw..",
-      "...wyyyyyyyyw...",
-      ".....obbbbo.....",
-      ".....obebeo.....",
-      ".....obbbbo.....",
-      "...wyyyyyyyyw...",
-      "..wyyyyyyyyyyw..",
-      ".wyyyyyyyyyyyyw.",
-      ".wyyyyw..wyyyyw.",
-      ".wwww......wwww.",
-      "................",
-      "................",
-    ], [
-      ".wwww......wwww.",
-      ".wyyyyw..wyyyyw.",
-      ".wyyyyyyyyyyyyw.",
-      "..wyyyyyyyyyyw..",
-      "...wyyyyyyyyw...",
-      ".....obbbbo.....",
-      ".....obebeo.....",
-      ".....obbbbo.....",
-      "....wwyyyyww....",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  안개불: {
-    motion: "flicker",
-    colors: { o: "#6e7370", b: "#d8dbd6", y: "#f0a05a" },
-    frames: [[
-      "................",
-      "..oooooooooooo..",
-      ".obbbbbbbbbbbbbo",
-      "obbbbbbbbbbbbbbo",
-      "obbbbbbbbbbbbbbo",
-      ".obbbbybbbbbbbo.",
-      "..obbbbbbbbbbo..",
-      "...oooooooooo...",
-      "....oooooooo....",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ], [
-      "................",
-      "..oooooooooooo..",
-      ".obbbbbbbbbbbbbo",
-      "obbbbbbbbbbbbbbo",
-      "obbbbbbbbbbbbbbo",
-      ".obbbbbbybbbbbo.",
-      "..obbbbbbbbbbo..",
-      "...oooooooooo...",
-      "....oooooooo....",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-      "................",
-    ]],
-  },
-  트레이너: {
-    motion: "breathe",
-    colors: { o: "#1c2820", h: "#2c2824", f: "#e8c9a4", e: "#1c2820", c: "#2f5c45", p: "#24382c" },
-    frames: [[
-      "................",
-      "......hhhh......",
-      "....ohhhhhho....",
-      "....ohffffho....",
-      "....oheeehfo....",
-      ".....ohffho.....",
-      "......oooo......",
-      "...occcccccco...",
-      "...occcccccco...",
-      "....occcccco....",
-      ".....oppppo.....",
-      ".....oppppo.....",
-      "......o..o......",
-      ".....oo..oo.....",
-      "................",
-      "................",
-    ]],
-  },
+// 32x32 픽셀 아트를 SVG 로 그린다. 데이터는 mons.js 의 window.PIX.
+// sprite(name, px, extra) 는 HTML 문자열을 돌려준다. 이름은 종 이름 또는 "트레이너".
+
+// 모르는 이름일 때 그리는 회색 물음표 실루엣.
+const UNKNOWN_PIX = {
+  motion: "breathe",
+  pal: { k: "#6b6f6a", g: "#b8bcb6", w: "#e6e8e4" },
+  front: [
+    "................................",
+    "................................",
+    "................................",
+    "...........kkkkkkkkkk...........",
+    ".........kkggggggggggkk.........",
+    "........kggggggggggggggk........",
+    ".......kgggggggggggggggk........",
+    ".......kggggkkkkkkkggggk........",
+    ".......kgggkwwwwwwwkgggk........",
+    ".......kgggkwwkkkwwkgggk........",
+    ".......kgggkkkk.kwwkgggk........",
+    ".......kggggggg.kwwkgggk........",
+    ".......kgggggggkwwkggggk........",
+    ".......kggggggkwwkgggggk........",
+    ".......kgggggkwwkggggggk........",
+    ".......kgggggkwwkggggggk........",
+    ".......kgggggkkkkggggggk........",
+    ".......kggggggggggggggk.........",
+    ".......kgggggkkkkggggggk........",
+    ".......kgggggkwwkggggggk........",
+    ".......kgggggkwwkggggggk........",
+    ".......kgggggkkkkggggggk........",
+    "........kggggggggggggggk........",
+    ".........kkggggggggggkk.........",
+    "...........kkkkkkkkkk...........",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+    "................................",
+  ],
 };
 
-function sprite(name, px, extra) {
-  const spec = SPRITES[name];
-  if (!spec) return "";
-  const frames = spec.frames.map((frame, index) => {
-    const rects = [];
-    frame.forEach((row, y) => {
-      for (let x = 0; x < row.length; x += 1) {
-        const fill = spec.colors[row[x]];
-        if (!fill) continue;
-        rects.push(`<rect x="${x}" y="${y}" width="1" height="1" fill="${fill}"/>`);
-      }
-    });
-    return `<g class="f${index}">${rects.join("")}</g>`;
-  }).join("");
-  const dim = extra ? ` ${extra}` : "";
-  return `<span class="sprite-slot ${spec.motion}${dim}" style="width:${px}px;height:${px}px"><svg class="sprite" width="${px}" height="${px}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true">${frames}</svg><i class="sprite-shadow"></i></span>`;
+function pixSpec(name) {
+  const pix = typeof window !== "undefined" ? window.PIX : null;
+  if (!pix) return UNKNOWN_PIX;
+  if (name === "트레이너") {
+    const person = pix.people.trainer;
+    return { motion: "breathe", pal: person.pal, keys: person.keys, front: person.frames.down[0] };
+  }
+  return pix.mons[name] || UNKNOWN_PIX;
 }
 
-if (typeof module !== "undefined") module.exports = { SPRITES, sprite };
+// 같은 색이 가로로 이어지면 rect 하나로 합친다.
+function pixRects(spec, rows, dx) {
+  const pix = typeof window !== "undefined" ? window.PIX : null;
+  const color = (ch) => {
+    if (ch === ".") return null;
+    if (pix && pix.colorOf) return pix.colorOf(spec, ch);
+    return spec.pal[ch] || null;
+  };
+  const rects = [];
+  rows.forEach((row, y) => {
+    let x = 0;
+    while (x < row.length) {
+      const fill = color(row[x]);
+      if (!fill) { x += 1; continue; }
+      let end = x + 1;
+      while (end < row.length && color(row[end]) === fill) end += 1;
+      rects.push(`<rect x="${x + dx}" y="${y}" width="${end - x}" height="1" fill="${fill}"/>`);
+      x = end;
+    }
+  });
+  return rects.join("");
+}
+
+function sprite(name, px, extra) {
+  const spec = pixSpec(name);
+  const rows = spec.front;
+  const w = rows[0].length;
+  const h = rows.length;
+  const box = Math.max(w, h);
+  const dx = Math.floor((box - w) / 2);
+  const body = pixRects(spec, rows, dx);
+  const motion = spec.motion || "breathe";
+  // wag/flicker 는 두 프레임을 번갈아 보여 주므로 1px 들린 프레임을 하나 더 넣는다.
+  const second = motion === "wag" || motion === "flicker"
+    ? `<g class="f1" transform="translate(0,-1)">${body}</g>`
+    : "";
+  const dim = extra ? ` ${extra}` : "";
+  return `<span class="sprite-slot ${motion}${dim}" style="width:${px}px;height:${px}px"><svg class="sprite" width="${px}" height="${px}" viewBox="0 0 ${box} ${box}" shape-rendering="crispEdges" aria-hidden="true"><g class="f0">${body}</g>${second}</svg><i class="sprite-shadow"></i></span>`;
+}
+
+if (typeof module !== "undefined") module.exports = { UNKNOWN_PIX, sprite };

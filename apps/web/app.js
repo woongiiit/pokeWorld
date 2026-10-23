@@ -1,20 +1,13 @@
-const MAP = [
-  ["rock", "rock", "rock", "rock", "rock"],
-  ["rock", "path", "path", "path", "rock"],
-  ["path", "grass", "grass", "grass", "path"],
-  ["stream", "grass", "grass", "grass", "stream"],
-  ["stream", "path", "path", "path", "stream"],
-  ["path", "grass", "grass", "grass", "path"],
-  ["path", "path", "path", "path", "path"],
-  ["path", "path", "gate", "path", "path"],
-];
-
 const TILE = {
   path: "길",
+  ground: "풀밭",
   grass: "풀숲",
   rock: "돌밭",
   stream: "개울",
-  gate: "입구",
+  bridge: "다리",
+  flower: "꽃밭",
+  heal: "광장",
+  boss: "북쪽 끝",
 };
 
 const STARTERS = [
@@ -77,6 +70,13 @@ let toastText = "";
 let toastUntil = 0;
 let pollTimer = 0;
 let refreshing = false;
+let talk = null; // { name, lines, i }
+let outro = null; // 전투가 끝난 뒤 연출이 끝날 때까지 전투 화면을 붙잡는다
+let outroTimer = 0;
+let lastBattleState = null; // 마지막으로 전투가 있던 상태. outro 동안 화면에 쓴다
+const moveQueue = [];
+let moveInFlight = false;
+let lastMoveDone = 0;
 
 function num(v) {
   const n = Number(v);
@@ -163,7 +163,7 @@ function leadSlot() {
 function mode() {
   if (!token || (state && !state.nickname)) return "join";
   if (!state) return loadError ? "retry" : "loading";
-  if (state.battle) return "battle";
+  if (state.battle || outro) return "battle";
   if (!state.party || state.party.length === 0) return "starter";
   return "field";
 }
@@ -185,7 +185,7 @@ function cueBattle(prev, next) {
     Sound.jingle("encounter", battleTrack(next));
     return;
   }
-  if (prev?.battle && !next.battle) {
+  if (prev?.battle && !next.battle && !window.Battle) {
     const last = oneLine(next.log);
     if (last === "포획") Sound.jingle("catch", "route");
     else if (last === "승리" || last === "북쪽") Sound.jingle("win", "route");
@@ -193,6 +193,118 @@ function cueBattle(prev, next) {
     return;
   }
   if (prev && !prev.incoming && next.incoming) Sound.sfx("ping");
+}
+
+const CHART = {
+  풀: { 풀: 1, 물: 0.5, 불: 2, 땅: 1 },
+  물: { 풀: 2, 물: 1, 불: 1, 땅: 0.5 },
+  불: { 풀: 0.5, 물: 1, 불: 1, 땅: 2 },
+  땅: { 풀: 1, 물: 2, 불: 0.5, 땅: 1 },
+};
+
+function effOf(moveName, attacker, defenderType) {
+  if (!attacker || !moveName) return 1;
+  const typed = moveName === attacker.move1;
+  if (!typed) return 1;
+  const row = CHART[attacker.type];
+  return row && row[defenderType] != null ? row[defenderType] : 1;
+}
+
+// prev 끝부분과 next 앞부분이 겹치는 만큼을 빼고 새로 붙은 줄만 돌려준다.
+function newLines(prevArr, nextArr) {
+  const p = Array.isArray(prevArr) ? prevArr : [];
+  const n = Array.isArray(nextArr) ? nextArr : [];
+  for (let k = 0; k <= n.length; k++) {
+    const head = n.slice(0, n.length - k);
+    if (head.length > p.length) continue;
+    const tail = p.slice(p.length - head.length);
+    if (head.every((v, i) => v === tail[i])) return n.slice(n.length - k);
+  }
+  return n.slice();
+}
+
+function monAt(s, slot) {
+  return (s?.party || []).find((p) => p.slot === slot) || null;
+}
+
+// 서버 응답 두 개를 비교해 전투 연출 이벤트를 만든다.
+function battleEvents(prev, next) {
+  const ev = [];
+  if (!prev || !window.Battle) return ev;
+  const pb = prev.battle;
+  const nb = next.battle;
+  if (!pb && nb) {
+    if (!nb.watch) ev.push({ type: "intro" });
+    return ev;
+  }
+  if (!pb) return ev;
+  if (pb.watch) return ev;
+  let lines;
+  let outcome = null;
+  if (nb) {
+    lines = newLines(pb.log, nb.log);
+  } else {
+    const all = newLines(prev.log, next.log);
+    outcome = all[all.length - 1] || null;
+    lines = all.slice(Math.min(pb.log.length, Math.max(0, all.length - 1)), Math.max(0, all.length - 1));
+  }
+  const prevMe = monAt(prev, pb.activeSlot);
+  const sameSlotNext = monAt(next, pb.activeSlot);
+  const foeHpFinal = nb ? nb.foe.hp : (outcome === "승리" || outcome === "북쪽" ? 0 : pb.foe.hp);
+  let myHpFinal = sameSlotNext ? sameSlotNext.hp : prevMe ? prevMe.hp : 0;
+  if (outcome === "패배" || lines.includes("기절")) myHpFinal = 0;
+  let foeHp = pb.foe.hp;
+  let myHp = prevMe ? prevMe.hp : 0;
+  const foeHpChanged = foeHpFinal !== pb.foe.hp;
+  let mineUsed = false;
+  const foeMon = { species: pb.foe.species, type: pb.foe.type, move1: pb.foe.move1, move2: pb.foe.move2 };
+  for (const line of lines) {
+    const m = /^(\S+) (\S+) (명중|빗나감)$/.exec(line);
+    if (m) {
+      const [, attacker, move, result] = m;
+      let who;
+      if (attacker === pb.foe.species && (!prevMe || attacker !== prevMe.species)) who = "foe";
+      else if (prevMe && attacker === prevMe.species && attacker !== pb.foe.species) who = "me";
+      else who = foeHpChanged && !mineUsed ? "me" : "foe";
+      if (who === "me") mineUsed = true;
+      const hit = result === "명중";
+      if (who === "me") {
+        ev.push({ type: "attack", who, move, hit, eff: effOf(move, prevMe, pb.foe.type), hpFrom: foeHp, hpTo: hit ? foeHpFinal : foeHp });
+        if (hit) foeHp = foeHpFinal;
+      } else {
+        ev.push({ type: "attack", who, move, hit, eff: effOf(move, foeMon, prevMe ? prevMe.type : ""), hpFrom: myHp, hpTo: hit ? myHpFinal : myHp });
+        if (hit) myHp = myHpFinal;
+      }
+      continue;
+    }
+    if (line === "기절") { ev.push({ type: "faint", who: "me" }); continue; }
+    if (line === "포획 실패") { ev.push({ type: "ball", shakes: Math.random() < 0.5 ? 1 : 2, caught: false }); continue; }
+    if (line === "교체" && nb && nb.phase === "replace") { ev.push({ type: "ball", shakes: 3, caught: true }); continue; }
+    if (line === "도망 실패") { ev.push({ type: "text", text: "도망칠 수 없었다!", ms: 700 }); continue; }
+  }
+  if (foeHpFinal === 0 && foeHp === 0 && (outcome === "승리" || outcome === "북쪽" || (nb && nb.phase === "down"))) {
+    ev.push({ type: "faint", who: "foe" });
+  }
+  if (nb && nb.activeSlot !== pb.activeSlot) {
+    const inMon = monAt(next, nb.activeSlot);
+    if (inMon) ev.push({ type: "switch", outName: prevMe && myHp > 0 ? prevMe.species : "", inSpecies: inMon.species, inName: inMon.species, inLevel: inMon.level, inHp: inMon.hp, inMaxHp: inMon.maxHp, inType: inMon.type, inExp: inMon.exp, inToNext: inMon.toNext });
+  }
+  if (outcome === "승리" && prevMe && sameSlotNext) {
+    const amount = pb.foe.level * 8;
+    const leveled = sameSlotNext.level > prevMe.level;
+    ev.push({ type: "exp", amount, to: sameSlotNext.exp, toNext: prevMe.toNext, levelUp: leveled });
+    if (leveled) ev.push({ type: "levelup", level: sameSlotNext.level, maxHp: sameSlotNext.maxHp, hp: sameSlotNext.hp, exp: sameSlotNext.exp, toNext: sameSlotNext.toNext, next: "wild" });
+    ev.push({ type: "win", text: "이겼다!" });
+  } else if (outcome === "북쪽") {
+    ev.push({ type: "win", text: "보스를 물리쳤다!" });
+  } else if (outcome === "포획") {
+    ev.push({ type: "ball", shakes: 3, caught: true });
+  } else if (outcome === "패배") {
+    ev.push({ type: "lose", text: "눈앞이 캄캄해졌다… 광장으로 돌아간다." });
+  } else if (outcome === "도망") {
+    ev.push({ type: "flee" });
+  }
+  return ev;
 }
 
 function remainLeft() {
@@ -203,6 +315,8 @@ function remainLeft() {
 function frozen() {
   if (busy) return true;
   if (mode() !== "battle") return false;
+  if (outro) return true;
+  if (window.Battle && Battle.busy()) return true;
   return remainLeft() <= 0;
 }
 
@@ -222,6 +336,7 @@ function normalize(s) {
     balls: num(s.balls),
     x: num(s.x),
     y: num(s.y),
+    dir: s.dir || "s",
     tile: s.tile || "",
     party: (s.party || []).map((p) => ({
       slot: num(p.slot),
@@ -244,6 +359,7 @@ function normalize(s) {
       nickname: mate.nickname || "",
       x: num(mate.x),
       y: num(mate.y),
+      dir: mate.dir || "s",
       bubble: mate.bubble || "",
       wild: mate.wild === true,
       pvp: mate.pvp === true,
@@ -264,6 +380,8 @@ function normalize(s) {
         level: num(foe.level),
         hp: num(foe.hp),
         maxHp: num(foe.maxHp),
+        move1: foe.move1 || "",
+        move2: foe.move2 || "",
       },
       activeSlot: num(s.battle.activeSlot),
       remainMs: num(s.battle.remainMs),
@@ -347,10 +465,18 @@ function applyState(raw, opts) {
   const phaseChanged = !prev?.battle || !next.battle || prev.battle.phase !== next.battle.phase;
   noteZero(next);
   cueBattle(prev, next);
+  const events = same ? [] : battleEvents(prev, next);
   state = next;
   if (next.battle) {
     remainBase = next.battle.remainMs;
     remainAt = Date.now();
+    lastBattleState = next;
+  }
+  if (prev?.battle && !next.battle && events.length && window.Battle) {
+    // 전투 화면을 붙잡고 마지막 연출을 보여준 뒤 필드로 돌아간다.
+    outro = { since: Date.now() };
+    clearTimeout(outroTimer);
+    outroTimer = setTimeout(endOutro, 9000);
   }
   ensurePoll();
   if (same) return;
@@ -366,6 +492,21 @@ function applyState(raw, opts) {
   }
   loadError = "";
   if (!opts?.keepError) error = "";
+  if (events.length && window.Battle) {
+    // render 보다 먼저 큐에 넣어야 체력판이 미리 뛰지 않는다.
+    Battle.play(events, () => {
+      if (outro) endOutro();
+      else render();
+    });
+  }
+  render();
+}
+
+function endOutro() {
+  clearTimeout(outroTimer);
+  outroTimer = 0;
+  if (!outro) return;
+  outro = null;
   render();
 }
 
@@ -490,6 +631,51 @@ function sendAct(body) {
   if (frozen()) return;
   sent = true;
   request("/api/act", body).finally(() => { sent = false; });
+}
+
+// 걷기는 주 버튼을 잠그지 않는다. 한 번에 한 요청씩 순서대로 보낸다.
+function pendingMoves() {
+  return moveQueue.length + (moveInFlight ? 1 : 0);
+}
+
+function selfPosFresh() {
+  return pendingMoves() > 0 || Date.now() - lastMoveDone < 800 ? 1 : 0;
+}
+
+function canWalk() {
+  return mode() === "field" && tutorStep() !== "rival" && !busy && !sheet && !talk && !overlay && moveQueue.length < 3;
+}
+
+function queueMove(dir) {
+  moveQueue.push(dir);
+  pumpMoves();
+}
+
+async function pumpMoves() {
+  if (moveInFlight || !moveQueue.length) return;
+  moveInFlight = true;
+  const dir = moveQueue.shift();
+  try {
+    const data = await api("/api/move", { dir });
+    if (tutor === "walk") setTutor("done");
+    if (data.state) applyState(data.state);
+  } catch (err) {
+    moveQueue.length = 0;
+    if (err.auth) {
+      dropAuth(showError(err.message));
+      return;
+    }
+    if (err.state) applyState(err.state, { keepError: true });
+    if (window.Field && state && mode() === "field") Field.snapTo(state.x, state.y);
+    if (err.offline) {
+      error = err.message;
+      render();
+    }
+  } finally {
+    moveInFlight = false;
+    lastMoveDone = Date.now();
+    if (moveQueue.length) pumpMoves();
+  }
 }
 
 function livingOthers() {
@@ -679,36 +865,128 @@ function renderStarter() {
     ${extra}${toastBox()}`;
 }
 
-function shownMates() {
-  const mates = state.others || [];
-  const ranked = [...mates].sort((a, b) => {
-    if (Boolean(a.bubble) !== Boolean(b.bubble)) return a.bubble ? -1 : 1;
-    const da = Math.abs(a.x - state.x) + Math.abs(a.y - state.y);
-    const db = Math.abs(b.x - state.x) + Math.abs(b.y - state.y);
-    return da - db;
-  });
-  return { tags: ranked.slice(0, 6), rest: ranked.slice(6) };
+function talkHtml() {
+  if (!talk) return "";
+  const line = talk.lines[talk.i] || "";
+  const last = talk.i >= talk.lines.length - 1;
+  return `<div class="talkbox" data-act="talk-next">
+      <b>${esc(talk.name)}</b>
+      <p>${esc(line)}</p>
+      <small>${last ? "닫기" : "다음"} ▸</small>
+    </div>`;
+}
+
+function fieldLayerHtml() {
+  return `${state.incoming && state.incoming.kind === "duel" ? dialog("한 판", `${esc(state.incoming.from)}가 한 판 하자고 해`, "거절", "duel-no", "수락", "duel-yes") : ""}
+    ${state.trade && state.trade.phase === "answer" ? sheetShell("교환", party().map((mon) => `<button type="button" class="row" data-act="trade-answer" data-slot="${mon.slot}">${esc(mon.species)}</button>`).join("")) : ""}
+    ${state.trade && state.trade.phase === "cancel" ? dialog("교환", "10초 안에 취소할 수 있어", "두기", "trade-wait", "취소", "trade-cancel") : ""}
+    ${fieldSheetHtml()}${talkHtml()}${toastBox()}`;
+}
+
+function fieldLogText() {
+  if (tutorStep() === "walk") return "북쪽 풀숲으로 가. 만나면 기술이나 볼을 써.";
+  const line = oneLine(state.log);
+  if (line) return line;
+  if (state.today) return `오늘 풀숲에 ${state.today}`;
+  if (!state.others || state.others.length === 0) return `코드 ${state.code || ""}를 친구에게 알려줘`;
+  return "";
+}
+
+function fieldMainLabel() {
+  if (talk) return talk.i >= talk.lines.length - 1 ? "닫기" : "다음";
+  return sheet ? "닫기" : "파티";
 }
 
 function renderField() {
-  const shown = shownMates();
-  const bubbles = shown.tags.filter((mate) => mate.bubble).slice(0, 2);
-  const rows = MAP.map((row, y) => row.map((tile, x) => {
-    const here = state.x === x && state.y === y;
-    const lead = party().find((p) => p.hp >= 1) || party()[0];
-    const tags = shown.tags.filter((mate) => mate.x === x && mate.y === y);
-    const dots = shown.rest.filter((mate) => mate.x === x && mate.y === y).length;
-    const names = tags.map((mate) => {
-      const said = bubbles.includes(mate) ? mate.bubble : "";
-      return `<button type="button" class="mate" data-act="mate" data-name="${esc(mate.nickname)}">${said ? `<i>${esc(said)}</i>` : ""}${esc(mate.nickname)}</button>`;
-    }).join("");
-    const body = here
-      ? `<span class="walker">${sprite("트레이너", 26, "you")}</span>${lead ? `<span class="glyph">${sprite(lead.species, 14)}</span>` : ""}`
-      : `<span class="tile-name">${esc(TILE[tile] || "")}</span>`;
-    return `<div class="cell ${tile}${here ? " here" : ""}">${names}${dots ? `<i class="dot"></i>` : ""}${body}</div>`;
-  }).join("")).join("");
-  const lockMove = busy || sheet;
-  const dir = (d, label, on) => `<button type="button" data-act="move" data-dir="${d}"${lockMove || !on ? " disabled" : ""}>${label}</button>`;
+  return `<div class="stage fieldstage">
+      <header class="hud">
+        <b class="tag">${esc(state.nickname)}</b>
+        <button type="button" class="textbtn" id="hud-code" data-act="open-code">코드 ${esc(state.code || "")}</button>
+        <span id="hud-balls">볼 ${num(state.balls)}</span>
+        ${soundButton()}
+      </header>
+      <div id="fieldwrap" class="fieldwrap"></div>
+      <p class="log" id="fieldlog">${esc(fieldLogText())}</p>
+      <div class="controls">
+        <div class="dpad">
+          <button type="button" class="dkey up" data-hold="n" aria-label="위">▲</button>
+          <button type="button" class="dkey left" data-hold="w" aria-label="왼쪽">◀</button>
+          <button type="button" class="dkey right" data-hold="e" aria-label="오른쪽">▶</button>
+          <button type="button" class="dkey down" data-hold="s" aria-label="아래">▼</button>
+        </div>
+        <div class="actions">
+          <button type="button" class="abtn" data-act="interact">A</button>
+          <div class="dock">
+            <button type="button" class="round" data-act="open-dex">기록</button>
+            <button type="button" class="round" data-act="open-say">한마디</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="foot">
+      <p class="err" id="fielderr">${esc(error)}</p>
+      ${mainButton(fieldMainLabel())}
+    </div>
+    <div id="layer">${fieldLayerHtml()}</div>`;
+}
+
+function mountField() {
+  const wrap = document.getElementById("fieldwrap");
+  if (!wrap || !window.Field) return;
+  Field.mount(wrap, {
+    canMove: canWalk,
+    onStep(dir) { queueMove(dir); },
+    onBump() { if (window.Sound) Sound.sfx("bump"); },
+    onTalk(npc) {
+      if (talk || sheet) return;
+      talk = { name: npc.name, lines: npc.lines, i: 0 };
+      if (window.Sound) Sound.sfx("menu");
+      render();
+    },
+    onSign(text) {
+      if (talk || sheet) return;
+      talk = { name: "표지판", lines: [text], i: 0 };
+      render();
+    },
+    onMate(name) {
+      if (talk) return;
+      pickedMate = name;
+      sheet = "mate";
+      render();
+    },
+  });
+  Field.update(state, 0);
+}
+
+function patchField() {
+  const balls = document.getElementById("hud-balls");
+  if (balls) balls.textContent = "볼 " + num(state.balls);
+  const code = document.getElementById("hud-code");
+  if (code) code.textContent = "코드 " + (state.code || "");
+  const log = document.getElementById("fieldlog");
+  if (log) log.textContent = fieldLogText();
+  const err = document.getElementById("fielderr");
+  if (err) err.textContent = error;
+  const layer = document.getElementById("layer");
+  if (layer) {
+    const html = fieldLayerHtml();
+    if (layer.dataset.html !== html) {
+      layer.innerHTML = html;
+      layer.dataset.html = html;
+    }
+  }
+  const main = document.getElementById("main");
+  if (main) {
+    main.textContent = fieldMainLabel();
+    main.disabled = busy;
+  }
+  if (window.Field) {
+    Field.update(state, selfPosFresh());
+    Field.setBubble(state.bubble);
+  }
+}
+
+function fieldSheetHtml() {
   let extra = "";
   if (sheet === "party") {
     const rowsHtml = [0, 1, 2].map((i) => {
@@ -748,41 +1026,7 @@ function renderField() {
       `<button type="button" class="row" data-act="trade-slot" data-slot="${mon.slot}">${esc(mon.species)}</button>`
     )).join(""));
   }
-  const mainLabel = sheet ? "닫기" : "파티";
-  return `<div class="stage">
-      <header class="hud">
-        <b class="tag">${esc(state.nickname)}</b>
-        <button type="button" class="textbtn" data-act="open-code">코드 ${esc(state.code || "")}</button>
-        <span>볼 ${num(state.balls)}</span>
-        <span>${num(state.x)},${num(state.y)} ${esc(tileName(state.tile))}</span>
-        ${soundButton()}
-      </header>
-      <div class="map">${rows}</div>
-      <p class="log">${esc(oneLine(state.log))}</p>
-      ${tutorStep() === "walk" ? `<p class="hint">위쪽 풀숲으로 가. 만나면 기술이나 볼을 써.</p>` : ""}
-      ${state.today ? `<p class="hint">오늘 풀숲에 ${esc(state.today)}</p>` : ""}
-      ${!state.others || state.others.length === 0 ? `<p class="hint">코드 ${esc(state.code || "")}</p>` : ""}
-      <div class="pad">
-        ${dir("n", "위", state.y > 0)}
-        <div class="pad-row">
-          ${dir("w", "왼쪽", state.x > 0)}
-          ${dir("s", "아래", state.y < 7)}
-          ${dir("e", "오른쪽", state.x < 4)}
-        </div>
-      </div>
-      <div class="dock">
-        <button type="button" class="round" data-act="open-dex"${busy ? " disabled" : ""}>기록</button>
-        <button type="button" class="round" data-act="open-say"${busy ? " disabled" : ""}>한마디</button>
-      </div>
-    </div>
-    <div class="foot">
-      <p class="err">${esc(error)}</p>
-      ${mainButton(mainLabel)}
-    </div>
-    ${state.incoming && state.incoming.kind === "duel" ? dialog("한 판", `${esc(state.incoming.from)}가 한 판 하자고 해`, "거절", "duel-no", "수락", "duel-yes") : ""}
-    ${state.trade && state.trade.phase === "answer" ? sheetShell("교환", party().map((mon) => `<button type="button" class="row" data-act="trade-answer" data-slot="${mon.slot}">${esc(mon.species)}</button>`).join("")) : ""}
-    ${state.trade && state.trade.phase === "cancel" ? dialog("교환", "10초 안에 취소할 수 있어", "두기", "trade-wait", "취소", "trade-cancel") : ""}
-    ${extra}${toastBox()}`;
+  return extra;
 }
 
 function dexCaughtIndex() {
@@ -820,7 +1064,7 @@ function dexHtml() {
 }
 
 function renderBattle() {
-  const b = state.battle;
+  const b = battleView().battle;
   const phase = b.phase;
   const lock = frozen();
   const sec = Math.ceil(remainLeft() / 1000);
@@ -891,21 +1135,91 @@ function renderBattle() {
     main = mainButton("판정 중", { disabled: true, pending: true });
   }
 
-  const inList = phase === "switch" || phase === "replace";
-  const stage = battleStage(b.foe, inList ? null : me, inList);
+  if (outro) {
+    aux = "";
+    main = mainButton("…", { disabled: true, pending: true });
+    body = "";
+    dialogHtml = "";
+  }
+  const parts = {
+    label,
+    sec,
+    urgent,
+    log: oneLine(b.log),
+    body,
+    foot: `${aux}<p class="err">${esc(error)}</p>${main}`,
+    layer: `${dialogHtml}${toastBox()}`,
+    slim: phase === "switch" || phase === "replace",
+  };
+  return parts;
+}
+
+function battleView() {
+  return state?.battle ? state : lastBattleState;
+}
+
+function battleScene() {
+  const s = battleView();
+  const b = s.battle;
+  const foe = { species: b.foe.species, name: b.foe.label || b.foe.species, level: b.foe.level, hp: b.foe.hp, maxHp: b.foe.maxHp, type: b.foe.type };
+  let mine = null;
+  if (b.watch && b.mate) {
+    mine = { species: b.mate.species, name: b.mate.species, level: num(b.mate.level), hp: num(b.mate.hp), maxHp: num(b.mate.maxHp), type: b.mate.type || "" };
+  } else {
+    const m = (s.party || []).find((p) => p.slot === b.activeSlot);
+    if (m) mine = { species: m.species, name: m.species, level: m.level, hp: m.hp, maxHp: m.maxHp, type: m.type, exp: m.exp, toNext: m.toNext };
+  }
+  const habitat = b.kind === "wild"
+    ? (["grass", "rock", "stream"].includes(s.tile) ? s.tile : "grass")
+    : b.kind === "pvp" ? "duel" : "boss";
+  return { kind: b.kind, habitat, foe, me: mine };
+}
+
+function renderBattleShell() {
+  const p = renderBattle();
   return `<div class="stage battle">
-      <div class="track${urgent ? " urgent" : ""}"><div class="fill" id="timebar"></div></div>
-      <div class="turnhead"><span>${esc(label)}</span><span id="secs"${urgent ? ' class="urgent"' : ""}>${sec}초</span></div>
-      ${stage}
-      <p class="log">${esc(oneLine(b.log))}</p>
-      <div class="scroll grow">${body}</div>
+      <div class="track${p.urgent ? " urgent" : ""}"><div class="fill" id="timebar"></div></div>
+      <div class="turnhead"><span id="bphase">${esc(p.label)}</span><span id="secs"${p.urgent ? ' class="urgent"' : ""}>${p.sec}초</span></div>
+      <div id="arenawrap" class="arenawrap${p.slim ? " slim" : ""}"></div>
+      <p class="log" id="blog">${esc(p.log)}</p>
+      <div class="scroll grow" id="bbody">${p.body}</div>
     </div>
-    <div class="foot">
-      ${aux}
-      <p class="err">${esc(error)}</p>
-      ${main}
-    </div>
-    ${dialogHtml}${toastBox()}`;
+    <div class="foot" id="bfoot">${p.foot}</div>
+    <div id="blayer">${p.layer}</div>`;
+}
+
+function mountBattle() {
+  const wrap = document.getElementById("arenawrap");
+  if (!wrap || !window.Battle) return;
+  Battle.mount(wrap, {
+    onText(text) {
+      const el = document.getElementById("blog");
+      if (el) el.textContent = text;
+    },
+  });
+  Battle.setScene(battleScene());
+}
+
+function patchBattle() {
+  const p = renderBattle();
+  const set = (id, html) => {
+    const el = document.getElementById(id);
+    if (el && el.dataset.html !== html) {
+      el.innerHTML = html;
+      el.dataset.html = html;
+    }
+  };
+  const phaseEl = document.getElementById("bphase");
+  if (phaseEl) phaseEl.textContent = p.label;
+  const animating = window.Battle && Battle.busy();
+  const log = document.getElementById("blog");
+  if (log && !animating && !(window.Battle && Battle.text)) log.textContent = p.log;
+  const wrap = document.getElementById("arenawrap");
+  if (wrap) wrap.classList.toggle("slim", p.slim);
+  set("bbody", p.body);
+  set("bfoot", p.foot);
+  set("blayer", p.layer);
+  if (window.Battle) Battle.setScene(battleScene());
 }
 
 function soundButton() {
@@ -928,6 +1242,19 @@ function render() {
       return;
     }
   }
+  const walking = m === "field" && tutorStep() !== "rival";
+  if (walking && app.dataset.mode === "field" && document.getElementById("fieldwrap")) {
+    patchField();
+    return;
+  }
+  if (m === "battle" && app.dataset.mode === "battle" && document.getElementById("arenawrap")) {
+    patchBattle();
+    paintToast();
+    return;
+  }
+  if (!walking && window.Field && document.getElementById("fieldwrap")) Field.destroy();
+  if (m !== "battle" && window.Battle && document.getElementById("arenawrap")) Battle.destroy();
+  if (!walking) talk = null;
   app.dataset.mode = m;
   let html = "";
   if (m === "loading") html = `<div class="stage center"><p>불러오는 중</p></div>${toastBox()}`;
@@ -937,9 +1264,11 @@ function render() {
   } else if (m === "join") html = renderJoin();
   else if (m === "starter") html = tutorStep() === "choose" ? renderStarter() : renderTalk();
   else if (m === "field" && tutorStep() === "rival") html = renderRival();
-  else if (m === "battle") html = renderBattle();
+  else if (m === "battle") html = renderBattleShell();
   else html = renderField();
   app.innerHTML = html;
+  if (walking) mountField();
+  if (m === "battle") mountBattle();
   const bar = document.getElementById("timebar");
   if (bar && state?.battle) {
     bar.style.width = Math.max(0, Math.min(100, (remainLeft() / 20000) * 100)) + "%";
@@ -976,6 +1305,10 @@ function onMain() {
     if (tutorStep() === "rival") {
       setTutor("walk");
       render();
+      return;
+    }
+    if (talk) {
+      advanceTalk();
       return;
     }
     if (sheet) {
@@ -1118,11 +1451,14 @@ app.addEventListener("click", (e) => {
     render();
     return;
   }
-  if (act === "move") {
-    if (sheet || mode() !== "field") return;
-    const dir = btn.dataset.dir;
-    return request("/api/move", { dir }, { after() { if (tutor === "walk") setTutor("done"); } });
+  if (act === "interact") {
+    if (mode() !== "field" || !window.Field) return;
+    if (talk) return advanceTalk();
+    if (sheet) return;
+    if (!Field.interact()) Field.release();
+    return;
   }
+  if (act === "talk-next") return advanceTalk();
   if (mode() !== "battle" || frozen()) return;
   if (act === "move2") return sendAct({ kind: "move2" });
   if (act === "ball") {
@@ -1156,6 +1492,54 @@ app.addEventListener("click", (e) => {
     overlay = null;
     return sendAct({ kind: "replace", slot });
   }
+});
+
+function advanceTalk() {
+  if (!talk) return;
+  if (talk.i < talk.lines.length - 1) talk.i += 1;
+  else talk = null;
+  if (window.Sound) Sound.sfx("blip");
+  render();
+}
+
+// D패드: 누르고 있는 동안 걷는다.
+const KEY_DIR = { ArrowUp: "n", ArrowDown: "s", ArrowLeft: "w", ArrowRight: "e", w: "n", s: "s", a: "w", d: "e" };
+function holdStart(e) {
+  const key = e.target.closest("[data-hold]");
+  if (!key || !window.Field) return;
+  e.preventDefault();
+  if (key.setPointerCapture && e.pointerId != null) {
+    try { key.setPointerCapture(e.pointerId); } catch {}
+  }
+  Field.hold(key.dataset.hold);
+}
+function holdEnd(e) {
+  const key = e.target.closest("[data-hold]");
+  if (!window.Field) return;
+  Field.release(key ? key.dataset.hold : null);
+}
+app.addEventListener("pointerdown", holdStart);
+app.addEventListener("pointerup", holdEnd);
+app.addEventListener("pointercancel", holdEnd);
+app.addEventListener("pointerleave", (e) => { if (e.target.closest && e.target.closest("[data-hold]")) holdEnd(e); }, true);
+app.addEventListener("contextmenu", (e) => { if (e.target.closest("[data-hold]")) e.preventDefault(); });
+document.addEventListener("keydown", (e) => {
+  if (e.repeat) return;
+  const dir = KEY_DIR[e.key];
+  if (dir && window.Field && mode() === "field") {
+    e.preventDefault();
+    Field.hold(dir);
+    return;
+  }
+  if ((e.key === "Enter" || e.key === " " || e.key === "z") && mode() === "field" && window.Field && !sheet && e.target.tagName !== "INPUT") {
+    e.preventDefault();
+    if (talk) advanceTalk();
+    else Field.interact();
+  }
+});
+document.addEventListener("keyup", (e) => {
+  const dir = KEY_DIR[e.key];
+  if (dir && window.Field) Field.release(dir);
 });
 
 app.addEventListener("input", (e) => {

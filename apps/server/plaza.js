@@ -41,6 +41,7 @@ function visible(account, all, now) {
       nickname: other.nickname,
       x: other.x,
       y: other.y,
+      dir: other.dir || "s",
       bubble: other.bubbleUntil > now ? other.bubbleText : "",
       wild: Boolean(other.battle && (other.battle.kind === "wild" || !other.battle.kind)),
       pvp: Boolean(other.battle && other.battle.kind === "pvp"),

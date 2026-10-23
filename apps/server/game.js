@@ -20,8 +20,8 @@ function createAccount({ token, nickname }) {
     token,
     nickname,
     balls: 0,
-    x: 2,
-    y: 7,
+    x: rules.WORLD.START.x,
+    y: rules.WORLD.START.y,
     lastMoveAt: null,
     ballSettledAt: null,
     started: false,
@@ -69,8 +69,8 @@ function heal(account) {
 }
 
 function warpGate(account) {
-  account.x = 2;
-  account.y = 7;
+  account.x = rules.WORLD.HEAL.x;
+  account.y = rules.WORLD.HEAL.y;
   heal(account);
 }
 
@@ -342,8 +342,8 @@ function chooseStarter(account, species, now) {
   account.balls = 10;
   account.ballSettledAt = now;
   account.started = true;
-  account.x = 2;
-  account.y = 7;
+  account.x = rules.WORLD.START.x;
+  account.y = rules.WORLD.START.y;
   heal(account);
   return { status: 200 };
 }
@@ -360,10 +360,11 @@ function tryMove(account, dir, now, rng, today) {
   if (account.battle) return { status: 400, error: "battle" };
   const delta = DIRECTIONS[dir];
   if (!delta) return { status: 400, error: "dir" };
+  account.dir = dir;
   const x = account.x + delta[0];
   const y = account.y + delta[1];
   if (!rules.tileAt(x, y)) return { status: 400, error: "bounds" };
-  if (account.lastMoveAt != null && now - account.lastMoveAt < 300) {
+  if (account.lastMoveAt != null && now - account.lastMoveAt < rules.MOVE_MS) {
     return { status: 400, error: "fast" };
   }
   account.x = x;
@@ -374,8 +375,8 @@ function tryMove(account, dir, now, rng, today) {
     return { status: 200 };
   }
   const tile = rules.tileAt(x, y);
-  if (tile === "gate") heal(account);
-  if (x === 2 && y === 0 && rules.bossWindow(now)) {
+  if (tile === "heal") heal(account);
+  if (x === rules.WORLD.BOSS.x && y === rules.WORLD.BOSS.y && rules.bossWindow(now)) {
     startBoss(account, rosterHook(), now);
     return { status: 200 };
   }
@@ -494,6 +495,8 @@ function view(account, now, today, extras) {
         level: account.battle.foeLevel,
         hp: account.battle.foeHp,
         maxHp: rules.stats(account.battle.foeSpecies, account.battle.foeLevel).hp,
+        move1: rules.SPECIES[account.battle.foeSpecies].move1.name,
+        move2: rules.SPECIES[account.battle.foeSpecies].move2.name,
       },
       activeSlot: account.battle.activeSlot,
       remainMs: Math.max(0, account.battle.deadline - now),
@@ -509,6 +512,7 @@ function view(account, now, today, extras) {
     x: account.x,
     y: account.y,
     tile: rules.tileAt(account.x, account.y),
+    dir: account.dir || "s",
     party: account.party
       .map((creature) => {
         const maxHp = rules.stats(creature.species, creature.level).hp;

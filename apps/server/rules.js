@@ -51,16 +51,8 @@ const TYPE_CHART = {
   땅: { 풀: 100, 물: 200, 불: 50, 땅: 100 },
 };
 
-const MAP = [
-  ["rock", "rock", "rock", "rock", "rock"],
-  ["rock", "path", "path", "path", "rock"],
-  ["path", "grass", "grass", "grass", "path"],
-  ["stream", "grass", "grass", "grass", "stream"],
-  ["stream", "path", "path", "path", "stream"],
-  ["path", "grass", "grass", "grass", "path"],
-  ["path", "path", "path", "path", "path"],
-  ["path", "path", "gate", "path", "path"],
-];
+const WORLD = require("../web/world.js");
+const MOVE_MS = 150;
 
 function row(type, habitat, hp, attack, defense, speed, hpG, attackG, defenseG, speedG, move1, move2) {
   return {
@@ -113,6 +105,10 @@ function migrateAccount(account) {
   }
   for (const name of SPECIES_ORDER) if (!dex[name]) dex[name] = "unseen";
   account.dex = dex;
+  if (!WORLD.walkable(account.x, account.y)) {
+    account.x = WORLD.HEAL.x;
+    account.y = WORLD.HEAL.y;
+  }
   return account;
 }
 
@@ -183,9 +179,9 @@ function applyExp(creature, amount) {
   }
 }
 
+// 걸을 수 있는 칸의 종류. 못 가는 칸과 NPC가 선 칸은 null.
 function tileAt(x, y) {
-  if (x < 0 || x > 4 || y < 0 || y > 7) return null;
-  return MAP[y][x];
+  return WORLD.tile(x, y);
 }
 
 function encounterRate(tile) {
@@ -327,7 +323,8 @@ module.exports = {
   STARTERS,
   SPECIES_ORDER,
   SPECIES,
-  MAP,
+  WORLD,
+  MOVE_MS,
   stats,
   creatureMove,
   canon,

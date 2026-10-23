@@ -104,15 +104,18 @@ test("오늘 출현이 비면 희귀 3종은 풀숲에 없다", () => {
 });
 
 test("들판 칸", () => {
-  assert.strictEqual(rules.tileAt(2, 7), "gate");
-  assert.strictEqual(rules.tileAt(2, 6), "path");
-  assert.strictEqual(rules.tileAt(2, 5), "grass");
-  assert.strictEqual(rules.tileAt(0, 0), "rock");
-  assert.strictEqual(rules.tileAt(0, 3), "stream");
-  assert.strictEqual(rules.tileAt(2, 0), "rock");
+  assert.strictEqual(rules.tileAt(10, 37), "ground");
+  assert.strictEqual(rules.tileAt(10, 36), "path");
+  assert.strictEqual(rules.tileAt(7, 23), "grass");
+  assert.strictEqual(rules.tileAt(7, 10), "rock");
+  assert.strictEqual(rules.tileAt(2, 14), "stream");
+  assert.strictEqual(rules.tileAt(10, 31), "heal");
+  assert.strictEqual(rules.tileAt(12, 3), "boss");
+  assert.strictEqual(rules.tileAt(0, 0), null);
+  assert.strictEqual(rules.tileAt(7, 29), null);
   assert.strictEqual(rules.tileAt(-1, 0), null);
   assert.strictEqual(rules.encounterRate("path"), 0);
-  assert.strictEqual(rules.encounterRate("gate"), 0);
+  assert.strictEqual(rules.encounterRate("heal"), 0);
   assert.strictEqual(rules.encounterRate("grass"), 30);
   assert.strictEqual(rules.encounterRate("rock"), 25);
   assert.strictEqual(rules.encounterRate("stream"), 25);
@@ -169,38 +172,54 @@ test("스타터 재선택은 409", () => {
   assert.strictEqual(player.balls, 10);
 });
 
-test("300ms 미만과 칸 밖은 거절하고 위치를 유지한다", () => {
+test("150ms 미만과 막힌 칸은 거절하고 위치를 유지한다", () => {
   const player = account();
   const rng = rules.scriptedRng([]);
   assert.strictEqual(game.handleMove(player, "n", 1000, rng).status, 200);
-  assert.deepStrictEqual([player.x, player.y], [2, 6]);
-  assert.strictEqual(game.handleMove(player, "n", 1299, rng).status, 400);
-  assert.deepStrictEqual([player.x, player.y], [2, 6]);
+  assert.deepStrictEqual([player.x, player.y], [10, 36]);
+  assert.strictEqual(game.handleMove(player, "n", 1149, rng).status, 400);
+  assert.deepStrictEqual([player.x, player.y], [10, 36]);
   assert.strictEqual(player.lastMoveAt, 1000);
-  player.x = 0;
-  player.y = 7;
-  assert.strictEqual(game.handleMove(player, "s", 2000, rng).status, 400);
-  assert.deepStrictEqual([player.x, player.y], [0, 7]);
+  player.x = 4;
+  player.y = 37;
+  assert.strictEqual(game.handleMove(player, "w", 2000, rng).status, 400);
+  assert.deepStrictEqual([player.x, player.y], [4, 37]);
   assert.strictEqual(player.lastMoveAt, 1000);
+  player.x = 7;
+  player.y = 30;
+  assert.strictEqual(game.handleMove(player, "n", 3000, rng).status, 400, "NPC가 선 칸은 막힌다");
+  assert.deepStrictEqual([player.x, player.y], [7, 30]);
 });
 
-test("입구에 도착하면 체력을 채운다", () => {
+test("광장에 도착하면 체력을 채운다", () => {
   const player = account();
-  player.x = 2;
-  player.y = 6;
+  player.x = 10;
+  player.y = 33;
   player.lastMoveAt = 1000;
   player.party[0].hp = 1;
-  assert.strictEqual(game.handleMove(player, "s", 2000, rules.scriptedRng([])).status, 200);
-  assert.deepStrictEqual([player.x, player.y], [2, 7]);
+  assert.strictEqual(game.handleMove(player, "n", 2000, rules.scriptedRng([])).status, 200);
+  assert.deepStrictEqual([player.x, player.y], [10, 32]);
   assert.strictEqual(player.party[0].hp, 30);
+});
+
+test("나무에 선 옛 좌표는 광장으로 옮긴다", () => {
+  const player = account();
+  player.x = 2;
+  player.y = 7;
+  rules.migrateAccount(player);
+  assert.deepStrictEqual([player.x, player.y], [10, 31]);
+  player.x = 7;
+  player.y = 23;
+  rules.migrateAccount(player);
+  assert.deepStrictEqual([player.x, player.y], [7, 23]);
 });
 
 test("풀숲 조우 후 싹물어 피해 11", () => {
   const player = account();
-  player.x = 2;
-  player.y = 6;
+  player.x = 8;
+  player.y = 23;
   player.lastMoveAt = 1000;
-  const moved = game.handleMove(player, "n", 2000, rules.scriptedRng([1, 1, 2]));
+  const moved = game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   assert.strictEqual(moved.status, 200);
   assert.strictEqual(player.battle.foeSpecies, "두더");
   assert.strictEqual(player.battle.foeLevel, 3);
@@ -214,25 +233,25 @@ test("풀숲 조우 후 싹물어 피해 11", () => {
 
 test("넘겨준 오늘 희귀는 풀숲에 한 번 나온다", () => {
   const player = account();
-  player.x = 2;
-  player.y = 6;
+  player.x = 8;
+  player.y = 23;
   player.lastMoveAt = 1000;
-  game.handleMove(player, "n", 2000, rules.scriptedRng([1, 4, 2]), "이슬꽃");
+  game.handleMove(player, "w", 2000, rules.scriptedRng([1, 4, 2]), "이슬꽃");
   assert.strictEqual(player.battle.foeSpecies, "이슬꽃");
   const again = account();
-  again.x = 2;
-  again.y = 6;
+  again.x = 8;
+  again.y = 23;
   again.lastMoveAt = 1000;
   again.rareSeenDate = rules.kstDate(2000);
   again.rareSeenSpecies = "이슬꽃";
-  game.handleMove(again, "n", 2000, rules.scriptedRng([1, 1, 2]), "이슬꽃");
+  game.handleMove(again, "w", 2000, rules.scriptedRng([1, 1, 2]), "이슬꽃");
   assert.strictEqual(again.battle.foeSpecies, "두더");
 });
 
 test("재돌은 피해 30으로 기절하고 경험치 24", () => {
   const player = account();
-  player.x = 1;
-  player.y = 1;
+  player.x = 8;
+  player.y = 10;
   player.lastMoveAt = 1000;
   game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   assert.strictEqual(player.battle.foeSpecies, "재돌");
@@ -242,15 +261,15 @@ test("재돌은 피해 30으로 기절하고 경험치 24", () => {
   assert.strictEqual(player.party[0].exp, 24);
   assert.strictEqual(player.party[0].level, 5);
   assert.strictEqual(player.dex["재돌"], "seen");
-  assert.deepStrictEqual([player.x, player.y], [0, 1]);
+  assert.deepStrictEqual([player.x, player.y], [7, 10]);
 });
 
 test("도망 65는 성공하고 경험치가 없다", () => {
   const player = account();
-  player.x = 2;
-  player.y = 6;
+  player.x = 8;
+  player.y = 23;
   player.lastMoveAt = 1000;
-  game.handleMove(player, "n", 2000, rules.scriptedRng([1, 1, 2]));
+  game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   game.handleAct(player, { kind: "flee" }, 2500, rules.scriptedRng([65]));
   assert.strictEqual(player.battle, null);
   assert.strictEqual(player.party[0].exp, 0);
@@ -259,8 +278,8 @@ test("도망 65는 성공하고 경험치가 없다", () => {
 
 test("체력 22 포획 20은 빈 슬롯에 넣고 볼이 준다", () => {
   const player = account();
-  player.x = 1;
-  player.y = 1;
+  player.x = 8;
+  player.y = 10;
   player.lastMoveAt = 1000;
   game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   assert.strictEqual(player.battle.foeHp, 22);
@@ -282,8 +301,8 @@ test("파티가 가득하면 교체 저장 전에 소유가 바뀌지 않는다"
   player.party.push({ slot: 1, species: "두더", level: 3, hp: 0, exp: 0 });
   player.party.push({ slot: 2, species: "찔레", level: 2, hp: 5, exp: 0 });
   player.dex["두더"] = "caught";
-  player.x = 1;
-  player.y = 1;
+  player.x = 8;
+  player.y = 10;
   player.lastMoveAt = 1000;
   game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   game.handleAct(player, { kind: "ball" }, 2500, rules.scriptedRng([20]));
@@ -304,8 +323,8 @@ test("교체 시간 초과는 체력 0인 가장 앞 슬롯을 보낸다", () =>
   const player = account();
   player.party.push({ slot: 1, species: "두더", level: 3, hp: 4, exp: 0 });
   player.party.push({ slot: 2, species: "찔레", level: 2, hp: 5, exp: 0 });
-  player.x = 1;
-  player.y = 1;
+  player.x = 8;
+  player.y = 10;
   player.lastMoveAt = 1000;
   game.handleMove(player, "w", 2000, rules.scriptedRng([1, 1, 2]));
   game.handleAct(player, { kind: "ball" }, 2500, rules.scriptedRng([20]));
@@ -319,13 +338,13 @@ test("교체 시간 초과는 체력 0인 가장 앞 슬롯을 보낸다", () =>
 
 test("볼 0과 전투 중 이동은 400이고 전투는 유지된다", () => {
   const player = account();
-  player.x = 2;
-  player.y = 6;
+  player.x = 8;
+  player.y = 23;
   player.lastMoveAt = 1000;
-  game.handleMove(player, "n", 2000, rules.scriptedRng([100]));
+  game.handleMove(player, "w", 2000, rules.scriptedRng([100]));
   assert.strictEqual(player.battle, null);
-  game.handleMove(player, "s", 2300, rules.scriptedRng([]));
-  game.handleMove(player, "n", 2700, rules.scriptedRng([1, 1, 2]));
+  game.handleMove(player, "e", 2300, rules.scriptedRng([]));
+  game.handleMove(player, "w", 2700, rules.scriptedRng([1, 1, 2]));
   const deadline = player.battle.deadline;
   const foeHp = player.battle.foeHp;
   player.balls = 0;
@@ -334,24 +353,24 @@ test("볼 0과 전투 중 이동은 400이고 전투는 유지된다", () => {
   assert.strictEqual(player.balls, 0);
   assert.strictEqual(player.battle.foeHp, foeHp);
   assert.strictEqual(player.battle.deadline, deadline);
-  const blocked = game.handleMove(player, "s", 4000, rules.scriptedRng([]));
+  const blocked = game.handleMove(player, "e", 4000, rules.scriptedRng([]));
   assert.strictEqual(blocked.status, 400);
-  assert.deepStrictEqual([player.x, player.y], [2, 5]);
+  assert.deepStrictEqual([player.x, player.y], [7, 23]);
   assert.strictEqual(player.battle.deadline, deadline);
 });
 
 test("패배는 입구에서 회복하고 쓴 볼은 돌아오지 않는다", () => {
   const player = account();
-  player.x = 2;
-  player.y = 6;
+  player.x = 8;
+  player.y = 23;
   player.lastMoveAt = 1000;
   player.balls = 9;
-  game.handleMove(player, "n", 2000, rules.scriptedRng([1, 2, 3]));
+  game.handleMove(player, "w", 2000, rules.scriptedRng([1, 2, 3]));
   assert.strictEqual(player.battle.foeSpecies, "퐁이");
   player.party[0].hp = 1;
   game.handleAct(player, { kind: "move1" }, 2500, rules.scriptedRng([1, 1]));
   assert.strictEqual(player.battle, null);
-  assert.deepStrictEqual([player.x, player.y], [2, 7]);
+  assert.deepStrictEqual([player.x, player.y], [10, 31]);
   assert.strictEqual(player.party[0].hp, 30);
   assert.strictEqual(player.party[0].exp, 0);
   assert.strictEqual(player.balls, 9);
@@ -381,7 +400,7 @@ test("응답에 확률과 배율 필드가 없다", () => {
   assert.strictEqual(state.party[0].move1, "싹물어");
   assert.strictEqual(state.party[0].move2, "뒹굴림");
   assert.strictEqual(state.party[0].toNext, 80);
-  assert.strictEqual(state.tile, "gate");
+  assert.strictEqual(state.tile, "ground");
 });
 
 if (failed > 0) {
